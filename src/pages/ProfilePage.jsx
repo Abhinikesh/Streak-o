@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import api from '../api/axios';
-import Navbar from '../layout/Navbar';
 import Spinner from '../ui/Spinner';
+import AddHabitModal from '../habits/AddHabitModal';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ProfilePage() {
@@ -32,10 +32,6 @@ export default function ProfilePage() {
 
   // Add Habit Modal State
   const [isAddHabitModalOpen, setIsAddHabitModalOpen] = useState(false);
-  const [newHabitName, setNewHabitName] = useState('');
-  const [newHabitIcon, setNewHabitIcon] = useState('💪');
-  const [newHabitColor, setNewHabitColor] = useState('#4F46E5');
-  const [newHabitPeriod, setNewHabitPeriod] = useState(defaultTrackingPeriod);
 
   // Inline Habit Edit State
   const [editingHabitId, setEditingHabitId] = useState(null);
@@ -115,16 +111,7 @@ export default function ProfilePage() {
     onError: () => toast.error('Failed to update profile.')
   });
 
-  const addHabitMut = useMutation({
-    mutationFn: async (newHabit) => api.post('/api/habits', newHabit),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      setIsAddHabitModalOpen(false);
-      setNewHabitName('');
-      toast.success('Habit added!');
-    },
-    onError: () => toast.error('Failed to add habit.')
-  });
+  // Extracted Mutation logic into modal
 
   const updateHabitMut = useMutation({
     mutationFn: async ({ id, payload }) => api.put(`/api/habits/${id}`, payload),
@@ -154,22 +141,7 @@ export default function ProfilePage() {
   };
 
   const openAddModal = () => {
-    setNewHabitName('');
-    setNewHabitIcon('💪');
-    setNewHabitColor('#4F46E5');
-    setNewHabitPeriod(defaultTrackingPeriod);
     setIsAddHabitModalOpen(true);
-  };
-
-  const handleAddHabit = (e) => {
-    e.preventDefault();
-    if (!newHabitName.trim()) return;
-    addHabitMut.mutate({
-      name: newHabitName,
-      icon: newHabitIcon,
-      colorHex: newHabitColor,
-      trackingPeriod: newHabitPeriod
-    });
   };
 
   const startEditingHabit = (h) => {
@@ -572,96 +544,12 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      {/* Reusable Add Habit Modal Form Popup overlay map constraints logic isolation wrapper setup */}
-      {isAddHabitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pt-4 pb-0 sm:p-4">
-          <div 
-            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" 
-            onClick={() => setIsAddHabitModalOpen(false)}
-          ></div>
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md p-6 sm:p-8 relative z-10 shadow-2xl animate-in fade-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            
-            <button 
-              onClick={() => setIsAddHabitModalOpen(false)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 bg-gray-100 rounded-full w-9 h-9 flex items-center justify-center transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-            
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Habit</h2>
-            
-            <form onSubmit={handleAddHabit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Habit Name <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" autoFocus required
-                  value={newHabitName}
-                  onChange={(e) => setNewHabitName(e.target.value)}
-                  placeholder="e.g., Read 10 pages"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 bg-white shadow-sm font-semibold text-gray-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Icon Setup</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {icons.map(icon => (
-                    <button
-                      key={icon} type="button"
-                      onClick={() => setNewHabitIcon(icon)}
-                      className={`text-2xl aspect-square rounded-xl flex items-center justify-center transition-all ${
-                        newHabitIcon === icon ? 'bg-indigo-100 scale-110 outline outline-2 outline-indigo-400' : 'bg-gray-50 border border-transparent hover:bg-gray-100'
-                      }`}
-                    >{icon}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Theme Identity</label>
-                <div className="flex gap-4 justify-between">
-                  {colors.map(color => (
-                    <button
-                      key={color.hex} type="button"
-                      onClick={() => setNewHabitColor(color.hex)}
-                      className={`w-10 h-10 outline outline-offset-2 transition-transform rounded-full flex items-center justify-center ${
-                        newHabitColor === color.hex ? 'scale-110 outline text-white relative z-10' : 'outline-transparent hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: color.hex, outlineColor: newHabitColor === color.hex ? color.hex : 'transparent' }}
-                    >
-                      {newHabitColor === color.hex && (
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7"></path></svg>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Goal Tracking Target</label>
-                <div className="flex gap-2 bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/60">
-                  {[30, 60, 90].map(days => (
-                    <button
-                      key={days} type="button"
-                      onClick={() => setNewHabitPeriod(days)}
-                      className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
-                        newHabitPeriod === days ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
-                      }`}
-                    >{days} days</button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="submit" disabled={addHabitMut.isPending}
-                className="w-full bg-indigo-600 text-white font-bold rounded-xl py-4 mt-2 hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-75"
-              >
-                {addHabitMut.isPending ? 'Adding...' : 'Save New Habit'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Reusable Add Habit Modal Form */}
+      <AddHabitModal
+        isOpen={isAddHabitModalOpen}
+        onClose={() => setIsAddHabitModalOpen(false)}
+        defaultTrackingPeriod={defaultTrackingPeriod}
+      />
 
     </div>
   );
