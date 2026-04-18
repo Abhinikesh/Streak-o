@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
+import passport from "./config/passport.js";
+import authRoutes from "./routes/auth.js";
 
 // Load environment variables
 dotenv.config();
@@ -20,13 +22,16 @@ app.use(
   })
 );
 
+// ── Passport (JWT-only, no sessions needed) ────────────────────
+app.use(passport.initialize());
+
 // ── Health check ───────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({ message: "StreakBoard API is running 🚀" });
 });
 
-// ── Routes will be added here in future prompts ────────────
-// app.use("/api/auth",   authRoutes);
+// ── Routes ───────────────────────────────────────────────────
+app.use("/api/auth",   authRoutes);
 // app.use("/api/habits", habitRoutes);
 // app.use("/api/logs",   logRoutes);
 
