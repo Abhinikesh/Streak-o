@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import passport from "./config/passport.js";
 import authRoutes from "./routes/auth.js";
+import habitRoutes from "./routes/habits.js";
+import logRoutes from "./routes/logs.js";
 
 // Load environment variables
 dotenv.config();
@@ -32,8 +34,11 @@ app.get("/", (req, res) => {
 
 // ── Routes ───────────────────────────────────────────────────
 app.use("/api/auth",   authRoutes);
-// app.use("/api/habits", habitRoutes);
-// app.use("/api/logs",   logRoutes);
+app.use("/api/habits", habitRoutes);
+app.use("/api/logs",   logRoutes);
+
+// ── Health check ───────────────────────────────────────────────
+app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 // ── Start Server ───────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
