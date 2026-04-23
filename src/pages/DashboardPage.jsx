@@ -9,6 +9,8 @@ import AddHabitModal from '../components/habits/AddHabitModal';
 import WeeklyView from '../components/habits/WeeklyView';
 import { getTodayString } from '../utils/dateUtils';
 import { useAuth } from '../context/AuthContext';
+import { playDoneSound, playMissedSound, playAllDoneSound } from '../utils/soundEffects';
+import { fireConfetti, fireSmallConfetti } from '../utils/confettiEffect';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -37,17 +39,46 @@ export default function DashboardPage() {
     onMutate: (variables) => setLoadingHabitId(variables.habitId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['logs'] });
+
+      // Sound
       if (variables.status === 'done') {
-        toast.success('🔥 Streak marked! Keep it up!', {
-          style: { background: '#22C55E', color: 'white', fontWeight: '600' },
-          duration: 2500, position: 'top-center',
-        });
+        playDoneSound();
       } else {
-        toast('Noted. Come back stronger tomorrow 💪', {
-          style: { background: '#6B7280', color: 'white', fontWeight: '500' },
-          duration: 2000, position: 'top-center',
-        });
+        playMissedSound();
       }
+
+      // Check all-done after refetch
+      setTimeout(() => {
+        const todayStr = getTodayString();
+        const allHabits = queryClient.getQueryData(['habits']) || [];
+        const allLogs = queryClient.getQueryData(['logs']) || [];
+        const todayDone = allLogs.filter(l => l.date === todayStr && l.status === 'done');
+        const doneIds = todayDone.map(l => (l.habit || l.habitId)?.toString());
+        const allIds = allHabits.map(h => h._id?.toString());
+        const allCompleted = allIds.length > 0 && allIds.every(id => doneIds.includes(id));
+
+        if (allCompleted && variables.status === 'done') {
+          setTimeout(() => {
+            playAllDoneSound();
+            fireConfetti();
+            toast.success('🎉 All habits done today! Amazing!', {
+              style: { background: '#4F46E5', color: 'white', fontWeight: '600' },
+              duration: 4000,
+            });
+          }, 200);
+        } else if (variables.status === 'done') {
+          fireSmallConfetti();
+          toast.success('🔥 Streak marked! Keep it up!', {
+            style: { background: '#22C55E', color: 'white', fontWeight: '600' },
+            duration: 2500, position: 'top-center',
+          });
+        } else {
+          toast('Noted. Come back stronger tomorrow 💪', {
+            style: { background: '#6B7280', color: 'white', fontWeight: '500' },
+            duration: 2000, position: 'top-center',
+          });
+        }
+      }, 400);
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to update log.'),
     onSettled: () => setLoadingHabitId(null),
@@ -69,6 +100,7 @@ export default function DashboardPage() {
 
   const totalHabits = habits.length;
   const progressPercent = totalHabits > 0 ? Math.round((completedTodayCount / totalHabits) * 100) : 0;
+  const isPerfectDay = totalHabits > 0 && completedTodayCount === totalHabits;
   const isLoading = habitsLoading || logsLoading;
 
   return (
@@ -92,16 +124,29 @@ export default function DashboardPage() {
 
         {/* Progress card */}
         {!isLoading && totalHabits > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 px-6 py-4 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 px-6 py-4 mb-6">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-xs font-bold tracking-widest text-gray-500 dark:text-gray-400 uppercase">Daily Progress</span>
-              <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                {completedTodayCount}/{totalHabits} done — {progressPercent}%
+              <span className="text-xs font-bold tracking-widest text-gray-500 dark:text-gray-400 uppercase">
+                Daily Progress
               </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                  {completedTodayCount}/{totalHabits} done
+                </span>
+                {isPerfectDay && (
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-bounce">
+                    🎉 Perfect Day!
+                  </span>
+                )}
+              </div>
             </div>
             <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out rounded-full"
+                className={`h-full transition-all duration-700 ease-out rounded-full ${
+                  isPerfectDay
+                    ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500'
+                    : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                }`}
                 style={{ width: `${progressPercent}%` }}
               />
             </div>

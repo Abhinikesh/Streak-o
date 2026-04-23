@@ -26,6 +26,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    shareCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    isProfilePublic: {
+      type: Boolean,
+      default: false,
+    },
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

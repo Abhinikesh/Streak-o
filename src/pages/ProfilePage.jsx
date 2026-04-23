@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import api from '../api/axios';
@@ -12,12 +13,14 @@ import { useTheme } from '../context/ThemeContext';
 export default function ProfilePage() {
   const { user, login, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [defaultTrackingPeriod, setDefaultTrackingPeriod] = useState(
     () => Number(localStorage.getItem('defaultTrackingPeriod')) || 30
   );
   const [reminderTime, setReminderTime] = useState(() => localStorage.getItem('reminderTime') || '09:00');
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundEnabled') !== 'false');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editProfileName, setEditProfileName] = useState('');
   const [isAddHabitModalOpen, setIsAddHabitModalOpen] = useState(false);
@@ -30,6 +33,7 @@ export default function ProfilePage() {
 
   useEffect(() => { localStorage.setItem('defaultTrackingPeriod', String(defaultTrackingPeriod)); }, [defaultTrackingPeriod]);
   useEffect(() => { localStorage.setItem('reminderTime', reminderTime); }, [reminderTime]);
+  useEffect(() => { localStorage.setItem('soundEnabled', String(soundEnabled)); }, [soundEnabled]);
 
   const icons = ['💪', '📚', '🧘', '🏃', '💧', '🥗', '😴', '✍️', '🎯', '🎸', '🧹', '💊'];
   const colors = [
@@ -45,6 +49,10 @@ export default function ProfilePage() {
   const { data: logsData = [], isLoading: logsLoading } = useQuery({
     queryKey: ['logs'],
     queryFn: async () => { const res = await api.get('/api/logs/all'); return res.data.logs || res.data || []; }
+  });
+  const { data: shareInfo = {} } = useQuery({
+    queryKey: ['shareInfo'],
+    queryFn: async () => { const r = await api.get('/api/social/my-share'); return r.data; }
   });
 
   const habits = Array.isArray(habitsData) ? habitsData : [];
@@ -271,7 +279,47 @@ export default function ProfilePage() {
             )}
           </section>
 
-          {/* Section 4: Tracking Settings */}
+          {/* Section 4: Sharing & Privacy */}
+          <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">Sharing &amp; Privacy</h2>
+            <div className="space-y-4">
+              {shareInfo.isProfilePublic ? (
+                <>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Your public profile is <span className="text-green-600 dark:text-green-400 font-semibold">active</span>. Share this link with friends:</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-gray-50 dark:bg-gray-700 rounded-xl px-4 py-2.5 font-mono text-sm text-gray-800 dark:text-gray-200 truncate">
+                      {window.location.origin}/u/{shareInfo.shareCode}
+                    </code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/u/${shareInfo.shareCode}`); toast('Link copied! 📋'); }}
+                      className="shrink-0 bg-indigo-600 text-white text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-indigo-700 transition-all"
+                    >Copy</button>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => { api.post('/api/social/disable').then(() => { queryClient.invalidateQueries({ queryKey: ['shareInfo'] }); toast('Profile hidden.'); }); }}
+                      className="text-sm text-red-500 dark:text-red-400 hover:underline font-medium">Disable sharing</button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Enable your public profile to share your habit progress with friends.</p>
+                  <button
+                    onClick={() => { api.post('/api/social/enable').then(() => queryClient.invalidateQueries({ queryKey: ['shareInfo'] })); }}
+                    className="bg-indigo-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-all text-sm">
+                    ✨ Enable public profile
+                  </button>
+                </div>
+              )}
+              <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                <button onClick={() => navigate('/friends')}
+                  className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
+                  Manage Friends →
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 5: Tracking Settings */}
           <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">Tracking Settings</h2>
             <div className="space-y-6">
@@ -330,6 +378,26 @@ export default function ProfilePage() {
                   </span>
                 </button>
               </div>
+              {/* Sound Effects Toggle */}
+              <div className="w-full h-px bg-gray-100 dark:bg-gray-700" />
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-base mb-0.5">Sound Effects</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Play sounds when marking habits.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSoundEnabled(v => !v)}
+                  className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none flex-shrink-0 ${soundEnabled ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'}`}
+                  aria-label="Toggle sound effects"
+                >
+                  <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center text-sm transition-transform duration-300 ${soundEnabled ? 'translate-x-7' : 'translate-x-0.5'}`}>
+                    {soundEnabled ? '🔊' : '🔇'}
+                  </span>
+                </button>
+              </div>
+
             </div>
           </section>
 
