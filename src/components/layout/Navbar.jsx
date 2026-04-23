@@ -19,11 +19,12 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    { name: 'Dashboard', path: '/dashboard' },
-    { name: 'Calendar', path: '/calendar' },
-    { name: 'Stats', path: '/stats' },
-    { name: 'Journal', path: '/journal' },
-    { name: 'Friends', path: '/friends' },
+    { name: 'Dashboard',   path: '/dashboard' },
+    { name: 'Calendar',    path: '/calendar' },
+    { name: 'Stats',       path: '/stats' },
+    { name: 'Journal',     path: '/journal' },
+    { name: 'Friends',     path: '/friends' },
+    { name: '🏆 Leaderboard', path: '/leaderboard' },
   ];
 
   return (

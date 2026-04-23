@@ -30,12 +30,21 @@ const userSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
+      default: null,
     },
     isProfilePublic: {
       type: Boolean,
       default: false,
     },
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    reminderEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    reminderTime: {
+      type: String,
+      default: '21:00', // stored in UTC "HH:MM"
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

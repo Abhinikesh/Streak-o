@@ -1,35 +1,31 @@
 import User from '../models/User.js';
 import Habit from '../models/Habit.js';
 import HabitLog from '../models/HabitLog.js';
-import { generateShareCode } from '../utils/generateShareCode.js';
-
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // ── POST /api/social/enable ────────────────────────────────────
 export const enableSharing = async (req, res) => {
   try {
-    let user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (!user.shareCode) {
-      let code;
-      let attempts = 0;
-      do {
-        code = generateShareCode(user.name || user.email);
-        attempts++;
-      } while (attempts < 10 && (await User.exists({ shareCode: code })));
-      user.shareCode = code;
+      const base = (user.name || user.email || 'user')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 10);
+      const suffix = Math.random().toString(36).slice(2, 6);
+      user.shareCode = `${base}-${suffix}`;
     }
+
     user.isProfilePublic = true;
+
     await user.save();
 
-    return res.status(200).json({
-      shareCode: user.shareCode,
-      shareUrl: `${CLIENT_URL}/u/${user.shareCode}`,
-    });
+    const shareUrl = `${process.env.CLIENT_URL}/u/${user.shareCode}`;
+    res.json({ shareCode: user.shareCode, shareUrl, isProfilePublic: true });
   } catch (err) {
-    console.error('[enableSharing]', err);
-    return res.status(500).json({ message: 'Server error' });
+    console.error('enableSharing error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -37,10 +33,9 @@ export const enableSharing = async (req, res) => {
 export const disableSharing = async (req, res) => {
   try {
     await User.findByIdAndUpdate(req.user.id, { isProfilePublic: false });
-    return res.status(200).json({ message: 'Profile hidden' });
+    res.json({ message: 'Profile hidden', isProfilePublic: false });
   } catch (err) {
-    console.error('[disableSharing]', err);
-    return res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -49,66 +44,102 @@ export const getMyShareInfo = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('shareCode isProfilePublic name');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    return res.status(200).json({
+
+    const shareUrl = user.shareCode
+      ? `${process.env.CLIENT_URL}/u/${user.shareCode}`
+      : null;
+
+    res.json({
       shareCode: user.shareCode || null,
-      isProfilePublic: user.isProfilePublic,
-      shareUrl: user.shareCode ? `${CLIENT_URL}/u/${user.shareCode}` : null,
+      isProfilePublic: user.isProfilePublic || false,
+      shareUrl,
     });
   } catch (err) {
-    console.error('[getMyShareInfo]', err);
-    return res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 // ── GET /api/social/u/:shareCode (PUBLIC) ─────────────────────
 export const getPublicProfile = async (req, res) => {
   try {
-    const user = await User.findOne({ shareCode: req.params.shareCode, isProfilePublic: true })
-      .select('name avatar createdAt shareCode');
-    if (!user) return res.status(404).json({ message: 'Profile not found or private' });
+    const { shareCode } = req.params;
 
-    const habits = await Habit.find({ userId: user._id, isActive: { $ne: false } })
-      .select('name icon colorHex trackingPeriod startDate');
-    const rawLogs = await HabitLog.find({ userId: user._id })
-      .select('habitId date status -note').sort({ date: -1 });
+    // Find user by shareCode only — do NOT filter by isProfilePublic here yet
+    const user = await User.findOne({ shareCode });
 
-    // Calculate stats
-    const doneLogs = rawLogs.filter(l => l.status === 'done');
+    if (!user) {
+      return res.status(404).json({ message: 'Profile not found or private' });
+    }
+
+    if (!user.isProfilePublic) {
+      return res.status(404).json({ message: 'Profile not found or private' });
+    }
+
+    // Query habits and logs INTERNALLY for stats only — never sent in response
+    const habits = await Habit.find({ userId: user._id, isActive: true })
+      .select('_id')
+      .lean();
+
+    const habitIds = habits.map(h => h._id);
+
+    const logs = await HabitLog.find({
+      userId: user._id,
+      habitId: { $in: habitIds },
+    })
+      .select('habitId date status')
+      .lean();
+
+    // Calculate stats server-side
+    const doneLogs = logs.filter(l => l.status === 'done');
+    const missedLogs = logs.filter(l => l.status === 'missed');
     const totalDone = doneLogs.length;
-    const totalLogged = rawLogs.length;
-    const overallRate = totalLogged > 0 ? Math.round((totalDone / totalLogged) * 100) : 0;
+    const totalMissed = missedLogs.length;
+    const overallRate = (totalDone + totalMissed) > 0
+      ? Math.round((totalDone / (totalDone + totalMissed)) * 100)
+      : 0;
 
-    // Current streak per habit, find max
+    // Calculate best streak across all habits, take max
     let longestStreak = 0;
-    let currentStreaks = 0;
-    const today = new Date().toISOString().split('T')[0];
-    habits.forEach(habit => {
-      const hLogs = rawLogs.filter(l => l.habitId.toString() === habit._id.toString() && l.status === 'done')
-        .map(l => l.date).sort((a, b) => b.localeCompare(a));
-      let streak = 0;
-      let cur = new Date(today);
-      for (const date of hLogs) {
-        const d = cur.toISOString().split('T')[0];
-        if (date === d) { streak++; cur.setDate(cur.getDate() - 1); }
-        else break;
+
+    habitIds.forEach(habitId => {
+      const habitDoneDates = logs
+        .filter(l => l.habitId.toString() === habitId.toString() && l.status === 'done')
+        .map(l => l.date)
+        .sort();
+
+      let best = 0, run = 0;
+      for (let i = 0; i < habitDoneDates.length; i++) {
+        if (i === 0) { run = 1; continue; }
+        const prev = new Date(habitDoneDates[i - 1] + 'T00:00:00');
+        const curr = new Date(habitDoneDates[i] + 'T00:00:00');
+        const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+        run = diff === 1 ? run + 1 : 1;
+        if (run > best) best = run;
       }
-      currentStreaks += streak;
-      if (streak > longestStreak) longestStreak = streak;
+      if (run > best) best = run;
+      if (best > longestStreak) longestStreak = best;
     });
 
-    const activeDates = new Set(doneLogs.map(l => l.date));
+    const uniqueActiveDays = [...new Set(doneLogs.map(l => l.date))].length;
 
-    return res.status(200).json({
-      name: user.name,
-      avatar: user.avatar,
+    // Return ONLY aggregate stats — no habit names, icons, logs, email, or friends
+    res.json({
+      name: user.name || 'StreakBoard User',
+      avatar: user.avatar || null,
       memberSince: user.createdAt,
-      habits,
-      logs: rawLogs.map(l => ({ habitId: l.habitId, date: l.date, status: l.status })),
-      stats: { totalDone, overallRate, longestStreak, daysActive: activeDates.size },
+      stats: {
+        totalHabits: habits.length,
+        totalDone,
+        longestStreak,
+        overallRate,
+        activeDays: uniqueActiveDays,
+      },
+      // habits array intentionally omitted — privacy
+      // logs array intentionally omitted — privacy
     });
   } catch (err) {
-    console.error('[getPublicProfile]', err);
-    return res.status(500).json({ message: 'Server error' });
+    console.error('getPublicProfile error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

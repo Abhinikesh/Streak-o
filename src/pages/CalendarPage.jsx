@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -8,13 +8,17 @@ import Navbar from '../components/layout/Navbar';
 import HabitCalendarGrid from '../components/habits/HabitCalendarGrid';
 import { getMonthString } from '../utils/dateUtils';
 import Spinner from '../components/ui/Spinner';
+import ShareModal from '../components/habits/ShareModal';
+import { useAuth } from '../context/AuthContext';
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
 
   const [selectedHabitId, setSelectedHabitId] = useState(searchParams.get('habit') || null);
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
+  const [shareHabitObj, setShareHabitObj] = useState(null);
 
   useEffect(() => {
     const habitParam = searchParams.get('habit');
@@ -95,6 +99,47 @@ export default function CalendarPage() {
 
   const selectedHabitObj = habits.find(h => h._id === selectedHabitId);
 
+  // ── Derived stats for ShareModal (client-side, no extra API calls) ─────────
+  const { currentStreak, bestStreak, completionRate } = useMemo(() => {
+    const doneLogs   = allLogs.filter(l => l.status === 'done');
+    const missedLogs = allLogs.filter(l => l.status === 'missed');
+    const total      = doneLogs.length + missedLogs.length;
+    const rate       = total > 0 ? Math.round((doneLogs.length / total) * 100) : 0;
+
+    const doneDates = doneLogs.map(l => l.date).sort();
+    const doneDateSet = new Set(doneDates);
+
+    // Current streak (backwards from today)
+    let cur = 0;
+    const todayD = new Date();
+    todayD.setHours(0, 0, 0, 0);
+    const todayStr = todayD.toISOString().split('T')[0];
+    let check = new Date(todayD);
+    for (let i = 0; i < 365; i++) {
+      const ds = check.toISOString().split('T')[0];
+      if (doneDateSet.has(ds)) { cur++; check.setDate(check.getDate() - 1); }
+      else if (ds === todayStr) { check.setDate(check.getDate() - 1); }
+      else break;
+    }
+
+    // Best streak (longest consecutive run)
+    let best = 0, run = 0;
+    for (let i = 0; i < doneDates.length; i++) {
+      if (i === 0) { run = 1; continue; }
+      const prev = new Date(doneDates[i - 1] + 'T00:00:00');
+      const curr = new Date(doneDates[i]     + 'T00:00:00');
+      const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+      run = diff === 1 ? run + 1 : 1;
+      if (run > best) best = run;
+    }
+    if (run > best) best = run;
+
+    return { currentStreak: cur, bestStreak: best, completionRate: rate };
+  }, [allLogs]);
+
+  const currentMonthLabel = format(currentMonth, 'MMMM yyyy');
+  const userName = user?.name || user?.email?.split('@')[0] || 'You';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 pb-24 font-sans">
       <Navbar />
@@ -142,34 +187,43 @@ export default function CalendarPage() {
 
             {selectedHabitId ? (
               <div className="space-y-5">
-                {/* Month navigation */}
-                <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-6 py-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 max-w-sm mx-auto">
-                  <button
-                    onClick={prevMonth}
-                    className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors focus:outline-none"
-                    aria-label="Previous month"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <span className="text-base font-semibold text-gray-800 dark:text-gray-100 tabular-nums tracking-wide">
-                    {format(currentMonth, 'MMMM yyyy')}
-                  </span>
-                  <button
-                    onClick={nextMonth}
-                    disabled={!canGoNext}
-                    className={`p-2 -mr-2 rounded-full transition-colors focus:outline-none ${
-                      !canGoNext
-                        ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
-                    }`}
-                    aria-label="Next month"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+                {/* Month navigation + Share button */}
+                <div className="flex items-center gap-3 justify-center flex-wrap">
+                  <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-6 py-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <button
+                      onClick={prevMonth}
+                      className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors focus:outline-none"
+                      aria-label="Previous month"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <span className="text-base font-semibold text-gray-800 dark:text-gray-100 tabular-nums tracking-wide px-4">
+                      {format(currentMonth, 'MMMM yyyy')}
+                    </span>
+                    <button
+                      onClick={nextMonth}
+                      disabled={!canGoNext}
+                      className={`p-2 -mr-2 rounded-full transition-colors focus:outline-none ${
+                        !canGoNext
+                          ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
+                      }`}
+                      aria-label="Next month"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+
+                  {/* Share button */}
+                  {selectedHabitObj && (
+                    <button
+                      onClick={() => setShareHabitObj(selectedHabitObj)}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                    >
+                      <span>Share</span>
+                      <span>🚀</span>
+                    </button>
+                  )}
                 </div>
 
                 {logsLoading ? (
@@ -200,6 +254,19 @@ export default function CalendarPage() {
           </div>
         )}
       </main>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={!!shareHabitObj}
+        onClose={() => setShareHabitObj(null)}
+        habit={shareHabitObj}
+        logs={allLogs}
+        currentStreak={currentStreak}
+        bestStreak={bestStreak}
+        completionRate={completionRate}
+        userName={userName}
+        month={currentMonthLabel}
+      />
     </div>
   );
 }

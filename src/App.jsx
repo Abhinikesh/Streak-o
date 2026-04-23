@@ -16,7 +16,9 @@ import ProfilePage from './pages/ProfilePage';
 import JournalPage from './pages/JournalPage';
 import FriendsPage from './pages/FriendsPage';
 import PublicProfilePage from './pages/PublicProfilePage';
+import LeaderboardPage from './pages/LeaderboardPage';
 import NotFoundPage from './pages/NotFoundPage';
+import FeedbackWidget from './components/FeedbackWidget';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,7 @@ export default function App() {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <FeedbackWidget />
             <Toaster 
               position="top-right" 
               toastOptions={{
@@ -51,6 +54,7 @@ export default function App() {
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/journal" element={<JournalPage />} />
                 <Route path="/friends" element={<FriendsPage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>
 
