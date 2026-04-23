@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Enable dark mode via .dark class on <html> (Tailwind v4 syntax) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -10,7 +13,14 @@
   }
 
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+    @apply antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: white;
+    color: #111827;
+  }
+
+  .dark body {
+    background-color: #111827;
+    color: #f9fafb;
   }
 }

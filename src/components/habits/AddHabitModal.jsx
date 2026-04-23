@@ -30,6 +30,7 @@ export default function AddHabitModal({ isOpen, onClose, defaultTrackingPeriod =
     { name: 'pink', hex: '#EC4899' },
     { name: 'teal', hex: '#14B8A6' },
   ];
+  const presets = [30, 60, 90];
 
   const addHabitMut = useMutation({
     mutationFn: async (newHabit) => api.post('/api/habits', newHabit),
@@ -44,11 +45,16 @@ export default function AddHabitModal({ isOpen, onClose, defaultTrackingPeriod =
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!newHabitName.trim()) return;
+    const period = Number(newHabitPeriod);
+    if (!period || period < 7 || period > 365) {
+      toast.error('Please enter between 7 and 365 days');
+      return;
+    }
     addHabitMut.mutate({
       name: newHabitName,
       icon: newHabitIcon,
       colorHex: newHabitColor,
-      trackingPeriod: newHabitPeriod
+      trackingPeriod: period,
     });
   };
 
@@ -119,19 +125,32 @@ export default function AddHabitModal({ isOpen, onClose, defaultTrackingPeriod =
             </div>
           </div>
 
+          {/* Fix 2 — Custom tracking period: presets + number input */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Goal Tracking Target</label>
-            <div className="flex gap-2 bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/60">
-              {[30, 60, 90].map(days => (
+            <div className="flex gap-2 mb-2">
+              {presets.map(days => (
                 <button
                   key={days} type="button"
                   onClick={() => setNewHabitPeriod(days)}
-                  className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-200 ${
-                    newHabitPeriod === days ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 hover:shadow-sm'
+                  className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all duration-200 ${
+                    Number(newHabitPeriod) === days
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
                   }`}
-                >{days} days</button>
+                >{days}</button>
               ))}
+              <input
+                type="number"
+                min="7"
+                max="365"
+                value={newHabitPeriod}
+                onChange={(e) => setNewHabitPeriod(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="Custom"
+                className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-semibold text-gray-900 text-center"
+              />
             </div>
+            <p className="text-xs text-gray-400 font-medium">Min 7 days, max 365 days</p>
           </div>
 
           <button

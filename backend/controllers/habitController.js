@@ -3,22 +3,27 @@ import Habit from "../models/Habit.js";
 // ── POST /api/habits ───────────────────────────────────────────
 /**
  * Create a new habit for the authenticated user.
- * Body: { name, icon, colorHex, trackingPeriod }
+ * Body: { name, icon, colorHex, trackingPeriod, startDate }
  */
 export const createHabit = async (req, res) => {
   try {
-    const { name, icon, colorHex, trackingPeriod } = req.body;
+    const { name, icon, colorHex, trackingPeriod, startDate } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "Habit name is required" });
     }
+
+    // Auto-set startDate to today if not provided
+    const resolvedStartDate =
+      startDate || new Date().toISOString().split("T")[0];
 
     const habit = await Habit.create({
       userId: req.user.id,
       name,
       icon,
       colorHex,
-      trackingPeriod,
+      trackingPeriod: Number(trackingPeriod) || 30,
+      startDate: resolvedStartDate,
     });
 
     return res.status(201).json(habit);
@@ -72,16 +77,21 @@ export const getHabitById = async (req, res) => {
 // ── PUT /api/habits/:id ────────────────────────────────────────
 /**
  * Update a habit's editable fields.
- * Body: { name, icon, colorHex, trackingPeriod }
+ * Body: { name, icon, colorHex, trackingPeriod, startDate }
  * Only updates if the habit belongs to req.user.id.
  */
 export const updateHabit = async (req, res) => {
   try {
-    const { name, icon, colorHex, trackingPeriod } = req.body;
+    const { name, icon, colorHex, trackingPeriod, startDate } = req.body;
+
+    const updatePayload = { name, icon, colorHex };
+    if (trackingPeriod !== undefined)
+      updatePayload.trackingPeriod = Number(trackingPeriod);
+    if (startDate !== undefined) updatePayload.startDate = startDate;
 
     const habit = await Habit.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
-      { $set: { name, icon, colorHex, trackingPeriod } },
+      { $set: updatePayload },
       { new: true, runValidators: true }
     );
 

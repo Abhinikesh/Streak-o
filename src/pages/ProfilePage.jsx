@@ -412,20 +412,32 @@ export default function ProfilePage() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5">Tracking Period Constraint</label>
-                            <div className="flex gap-2 bg-gray-200/50 p-1 rounded-lg">
-                              {[30, 60, 90].map(days => (
-                                <button
-                                  key={days}
-                                  type="button"
-                                  onClick={() => setEditHabitPeriod(days)}
-                                  className={`flex-1 py-1.5 text-sm font-bold rounded-md transition-all ${
-                                    editHabitPeriod === days ? 'bg-white text-indigo-700 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-800'
-                                  }`}
-                                >{days} Days</button>
-                              ))}
-                            </div>
-                          </div>
+                             <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5">Tracking Period</label>
+                             <div className="flex gap-2 mb-1.5">
+                               {[30, 60, 90].map(days => (
+                                 <button
+                                   key={days}
+                                   type="button"
+                                   onClick={() => setEditHabitPeriod(days)}
+                                   className={`px-3 py-1.5 text-sm font-bold rounded-lg border transition-all ${
+                                     Number(editHabitPeriod) === days
+                                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                       : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
+                                   }`}
+                                 >{days}</button>
+                               ))}
+                               <input
+                                 type="number"
+                                 min="7"
+                                 max="365"
+                                 value={editHabitPeriod}
+                                 onChange={(e) => setEditHabitPeriod(e.target.value === '' ? '' : Number(e.target.value))}
+                                 placeholder="Days"
+                                 className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-gray-900 text-center"
+                               />
+                             </div>
+                             <p className="text-[11px] text-gray-400 font-medium">Min 7 days, max 365 days</p>
+                           </div>
                           
                           <div className="flex gap-3 justify-end pt-2 border-t border-gray-200/60 mt-4">
                             <button 
@@ -458,26 +470,39 @@ export default function ProfilePage() {
             
             <div className="space-y-6">
               
-              {/* Context Option */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Fix 3 — Default Goal Length: presets + custom input */}
+              <div className="flex flex-col gap-3">
                 <div>
                   <h3 className="font-bold text-gray-900 leading-none mb-1 text-lg">Default Goal Length</h3>
                   <p className="text-sm font-medium text-gray-500">Automatically preselect tracking length for new routines.</p>
                 </div>
-                <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200/60 shrink-0 self-start sm:self-auto">
+                <div className="flex items-center gap-2">
                   {[30, 60, 90].map(days => (
                     <button
                       key={days}
                       type="button"
                       onClick={() => setDefaultTrackingPeriod(days)}
-                      className={`px-4 sm:px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${
-                        defaultTrackingPeriod === days ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-gray-200/50' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200/50'
+                      className={`px-4 py-2.5 text-sm font-bold rounded-lg border transition-all ${
+                        Number(defaultTrackingPeriod) === days
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
                       }`}
                     >
-                      {days} days
+                      {days}
                     </button>
                   ))}
+                  <input
+                    type="number"
+                    min="7"
+                    max="365"
+                    value={defaultTrackingPeriod}
+                    onChange={(e) => setDefaultTrackingPeriod(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Custom"
+                    className="w-24 px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-semibold text-gray-900 text-center"
+                  />
+                  <span className="text-sm font-medium text-gray-500">days</span>
                 </div>
+                <p className="text-xs text-gray-400 font-medium">Min 7 days, max 365 days</p>
               </div>
 
               <div className="w-full h-px bg-gray-100/80"></div>

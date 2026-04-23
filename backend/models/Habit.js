@@ -13,16 +13,19 @@ const habitSchema = new mongoose.Schema(
       trim: true,
     },
     icon: {
-      type: String, // emoji string e.g. "🏃"
+      type: String,
       default: "⭐",
     },
     colorHex: {
-      type: String, // e.g. "#FF6B6B"
+      type: String,
       default: "#6366F1",
     },
+    startDate: {
+      type: String,
+      default: null, // "YYYY-MM-DD" — the day user started this habit
+    },
     trackingPeriod: {
-      type: Number,
-      enum: [30, 60, 90],
+      type: Number, // plain Number — accepts any value (7-365)
       default: 30,
     },
     isActive: {
