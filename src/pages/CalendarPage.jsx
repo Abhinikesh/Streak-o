@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 import api from '../api/axios';
 import Navbar from '../components/layout/Navbar';
 import HabitCalendarGrid from '../components/habits/HabitCalendarGrid';
+import { getMonthString } from '../utils/dateUtils';
 import Spinner from '../components/ui/Spinner';
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [selectedHabitId, setSelectedHabitId] = useState(searchParams.get('habit') || null);
+  const [currentMonth, setCurrentMonth] = useState(() => new Date());
 
   useEffect(() => {
     const habitParam = searchParams.get('habit');
@@ -22,6 +26,7 @@ export default function CalendarPage() {
     setSearchParams({ habit: id });
   };
 
+  // ── Habits query ───────────────────────────────────────────────
   const { data: habitsData = [], isLoading: habitsLoading } = useQuery({
     queryKey: ['habits'],
     queryFn: async () => {
@@ -32,61 +37,83 @@ export default function CalendarPage() {
 
   const habits = Array.isArray(habitsData) ? habitsData : [];
 
-  const { data: allLogsData = [], isLoading: logsLoading } = useQuery({
-    queryKey: ['logs'],
+  // ── Logs query — keyed by habit + month (used for grid rendering) ──
+  const monthStr = getMonthString(currentMonth);
+  const { data: logsData = [], isLoading: logsLoading } = useQuery({
+    queryKey: ['logs', selectedHabitId, monthStr],
     queryFn: async () => {
-      const res = await api.get('/api/logs/all');
+      const res = await api.get(`/api/logs/${selectedHabitId}?month=${monthStr}`);
       return res.data.logs || res.data || [];
     },
     enabled: !!selectedHabitId
   });
 
-  const logs = (Array.isArray(allLogsData) ? allLogsData : [])
-    .filter(l => l.habit === selectedHabitId || l.habitId === selectedHabitId);
+  const logs = Array.isArray(logsData) ? logsData : [];
 
-  const logMut = useMutation({
-    mutationFn: async ({ habitId, date, status }) => {
-      return api.post('/api/logs', { habitId, date, status });
+  // ── All logs query — no month filter (used for stats bar) ─────────
+  const { data: allLogsData } = useQuery({
+    queryKey: ['allLogs', selectedHabitId],
+    queryFn: async () => {
+      const res = await api.get(`/api/logs/${selectedHabitId}`);
+      return res.data.logs || res.data || [];
     },
-    onMutate: async ({ habitId, date, status }) => {
-      const queryKey = ['logs'];
-      await queryClient.cancelQueries({ queryKey });
-      const previousLogs = queryClient.getQueryData(queryKey) || [];
-      queryClient.setQueryData(queryKey, old => {
-        if (!old) return [{ habitId, date, status }];
-        const existing = old.find(l => (l.habit === habitId || l.habitId === habitId) && l.date === date);
-        if (existing) return old.map(l => (l.habit === habitId || l.habitId === habitId) && l.date === date ? { ...l, status } : l);
-        return [...old, { habitId, date, status }];
-      });
-      return { previousLogs, queryKey };
+    enabled: !!selectedHabitId
+  });
+
+  const allLogs = Array.isArray(allLogsData) ? allLogsData : [];
+
+  // ── Log mutation ───────────────────────────────────────────────
+  const logMutation = useMutation({
+    mutationFn: ({ habitId, date, status }) =>
+      api.post('/api/logs', { habitId, date, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['logs', selectedHabitId, monthStr] });
+      queryClient.invalidateQueries({ queryKey: ['allLogs', selectedHabitId] });
+      toast.success('Logged!', { duration: 1500 });
     },
-    onError: (err, _vars, context) => {
-      queryClient.setQueryData(context.queryKey, context.previousLogs);
-      toast.error(err.response?.data?.message || 'Failed to sync log.');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    onError: () => {
+      toast.error('Failed to save. Try again.');
     }
   });
 
-  const handleLog = (habitId, date, status) => logMut.mutate({ habitId, date, status });
+  const handleLog = (habitId, date, status) => {
+    logMutation.mutate({ habitId, date, status });
+  };
+
+  // ── Month navigation ───────────────────────────────────────────
+  const today = new Date();
+  const canGoNext =
+    currentMonth.getFullYear() < today.getFullYear() ||
+    (currentMonth.getFullYear() === today.getFullYear() &&
+      currentMonth.getMonth() < today.getMonth());
+
+  const prevMonth = () =>
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const nextMonth = () => {
+    if (canGoNext) setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
   const selectedHabitObj = habits.find(h => h._id === selectedHabitId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 pb-24 font-sans">
       <Navbar />
+
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-10">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-6">Calendar</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-6">Calendar</h1>
 
         {habitsLoading ? (
           <div className="flex justify-center py-10"><Spinner size="md" /></div>
         ) : habits.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl text-center border border-gray-200 dark:border-gray-700 shadow-sm">
-            <p className="text-gray-500 dark:text-gray-400 font-medium">You don't have any habits yet. Start by adding one from the Dashboard!</p>
+            <p className="text-gray-500 dark:text-gray-400 font-medium">
+              You don't have any habits yet. Start by adding one from the Dashboard!
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Habit selector pills card */}
+
+            {/* Habit selector pills */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 px-4 py-3">
               <div className="flex overflow-x-auto gap-3 snap-x no-scrollbar">
                 {habits.map(habit => {
@@ -98,9 +125,12 @@ export default function CalendarPage() {
                       className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-center focus:outline-none ${
                         isSelected
                           ? 'text-white shadow-md scale-105'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-200 dark:hover:bg-gray-600'
                       }`}
-                      style={isSelected ? { backgroundColor: habit.colorHex || '#4F46E5', boxShadow: `0 4px 14px 0 ${habit.colorHex || '#4F46E5'}40` } : {}}
+                      style={isSelected ? {
+                        backgroundColor: habit.colorHex || '#4F46E5',
+                        boxShadow: `0 4px 14px 0 ${habit.colorHex || '#4F46E5'}40`
+                      } : {}}
                     >
                       <span className="text-base leading-none">{habit.icon}</span>
                       <span className="whitespace-nowrap">{habit.name}</span>
@@ -111,21 +141,59 @@ export default function CalendarPage() {
             </div>
 
             {selectedHabitId ? (
-              logsLoading ? (
-                <div className="h-64 flex items-center justify-center bg-white/50 dark:bg-gray-800/50 rounded-3xl border border-gray-100 dark:border-gray-700">
-                  <Spinner size="lg" />
+              <div className="space-y-5">
+                {/* Month navigation */}
+                <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-6 py-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 max-w-sm mx-auto">
+                  <button
+                    onClick={prevMonth}
+                    className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors focus:outline-none"
+                    aria-label="Previous month"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <span className="text-base font-semibold text-gray-800 dark:text-gray-100 tabular-nums tracking-wide">
+                    {format(currentMonth, 'MMMM yyyy')}
+                  </span>
+                  <button
+                    onClick={nextMonth}
+                    disabled={!canGoNext}
+                    className={`p-2 -mr-2 rounded-full transition-colors focus:outline-none ${
+                      !canGoNext
+                        ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
+                    }`}
+                    aria-label="Next month"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
-              ) : (
-                selectedHabitObj && (
-                  <HabitCalendarGrid habit={selectedHabitObj} logs={logs} onLog={handleLog} />
-                )
-              )
+
+                {logsLoading ? (
+                  <div className="h-96 flex items-center justify-center bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
+                    <Spinner size="lg" />
+                  </div>
+                ) : (
+                  selectedHabitObj && (
+                    <HabitCalendarGrid
+                      habit={selectedHabitObj}
+                      logs={logs}
+                      allLogs={allLogs}
+                      currentMonth={currentMonth}
+                      onLog={handleLog}
+                    />
+                  )
+                )}
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 px-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
                 <div className="text-6xl mb-6 bg-indigo-50 dark:bg-indigo-900/30 w-24 h-24 rounded-full flex items-center justify-center rotate-12 drop-shadow-sm">📅</div>
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">Calendar Explorer</h3>
-                <p className="text-gray-500 dark:text-gray-400 font-medium text-center">
-                  Select a habit from above<br className="hidden sm:block" /> to view its full streak window.
+                <p className="text-gray-600 dark:text-gray-300 font-medium text-center">
+                  Select a habit above<br className="hidden sm:block" /> to view its monthly calendar.
                 </p>
               </div>
             )}

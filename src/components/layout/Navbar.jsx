@@ -22,6 +22,7 @@ export default function Navbar() {
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Calendar', path: '/calendar' },
     { name: 'Stats', path: '/stats' },
+    { name: 'Journal', path: '/journal' },
   ];
 
   return (

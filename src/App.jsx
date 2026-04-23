@@ -13,6 +13,7 @@ import DashboardPage from './pages/DashboardPage';
 import CalendarPage from './pages/CalendarPage';
 import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
+import JournalPage from './pages/JournalPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ export default function App() {
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/journal" element={<JournalPage />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>
 

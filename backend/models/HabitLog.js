@@ -25,6 +25,11 @@ const habitLogSchema = new mongoose.Schema(
       },
       required: [true, "status is required"],
     },
+    note: {
+      type: String,
+      default: '',
+      maxLength: [280, 'Note cannot exceed 280 characters'],
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
