@@ -41,8 +41,22 @@ export default function DashboardPage() {
     onMutate: (variables) => {
       setLoadingHabitId(variables.habitId);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['logs'] });
+      // Fix 3 — Toast confirmation on tick/cross
+      if (variables.status === 'done') {
+        toast.success('🔥 Streak marked! Keep it up!', {
+          style: { background: '#22C55E', color: 'white', fontWeight: '600' },
+          duration: 2500,
+          position: 'top-center',
+        });
+      } else if (variables.status === 'missed') {
+        toast('Noted. Come back stronger tomorrow 💪', {
+          style: { background: '#6B7280', color: 'white', fontWeight: '500' },
+          duration: 2000,
+          position: 'top-center',
+        });
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Failed to update log.');
@@ -63,6 +77,7 @@ export default function DashboardPage() {
   const logs = Array.isArray(logsData) ? logsData : [];
   
   const todayStr = getTodayString();
+  // Fix 1 — Sharp date text, no opacity classes
   const dateDisplay = format(new Date(), 'EEEE, MMMM d');
 
   const hour = new Date().getHours();
@@ -71,44 +86,52 @@ export default function DashboardPage() {
   else if (hour < 17) greeting = 'Good afternoon';
 
   const completedTodayCount = habits.filter(h => {
-    // If backend uses "habit" string check, otherwise "habitId" property
     const habitKey = h._id; 
     const log = logs.find(l => (l.habit === habitKey || l.habitId === habitKey) && l.date === todayStr);
     return log?.status === 'done';
   }).length;
   
   const totalHabits = habits.length;
-  // Calculate percentage dynamically
   const progressPercent = totalHabits > 0 ? Math.round((completedTodayCount / totalHabits) * 100) : 0;
   const isLoading = habitsLoading || logsLoading;
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-24">
-      <Navbar /> {/* Assumed existing per prompt */}
+    // Fix 4 — Soft gradient page background
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 pb-24">
+      <Navbar />
       
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-10">
         
-        {/* Header Section */}
-        <header className="mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">Today</h1>
-          <p className="text-gray-500 font-medium mt-1 text-lg">{dateDisplay}</p>
-          <p className="text-indigo-600 font-semibold mt-6 text-xl">
-            {greeting}, {user?.firstName || user?.name?.split(' ')[0] || 'User'}!
+        {/* Fix 4 — Header Section: decorative white card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 px-6 py-5 mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Today</h1>
+            {/* Fix 1 — Sharp date text: text-base font-medium text-gray-600, no opacity/blur */}
+            <p className="text-base font-medium text-gray-600 mt-0.5">{dateDisplay}</p>
+          </div>
+          <p className="text-indigo-600 font-semibold text-base sm:text-lg text-right">
+            {greeting},<br className="hidden sm:block" />{' '}
+            <span className="text-indigo-700 font-bold">
+              {user?.firstName || user?.name?.split(' ')[0] || 'User'}!
+            </span>
           </p>
-        </header>
+        </div>
 
-        {/* Progress Bar View */}
+        {/* Fix 4 — Progress Bar Card: white card, gradient fill, bold indigo % */}
         {!isLoading && totalHabits > 0 && (
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8 border-b-4 border-b-gray-100">
-            <div className="flex justify-between items-end mb-3">
+          <div className="bg-white rounded-2xl shadow-md border border-gray-100 px-6 py-4 mb-8">
+            <div className="flex justify-between items-center mb-3">
               <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Daily Progress</span>
-              <span className="text-indigo-600 font-bold text-lg">{completedTodayCount} of {totalHabits} done</span>
+              <span className="text-indigo-600 font-bold text-base">
+                {completedTodayCount}/{totalHabits} &nbsp;
+                <span className="text-indigo-500 font-extrabold">{progressPercent}%</span>
+              </span>
             </div>
-            <div className="h-4 bg-gray-100/80 rounded-full overflow-hidden w-full relative">
+            <div className="h-3 bg-gray-100 rounded-full overflow-hidden w-full">
               <div 
-                className="h-full bg-indigo-500 transition-all duration-700 ease-out absolute left-0 top-0 bottom-0 rounded-full"
+                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out rounded-full"
                 style={{ width: `${progressPercent}%` }}
-              ></div>
+              />
             </div>
           </div>
         )}
@@ -155,10 +178,10 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Floating Action Button (+) */}
+      {/* Fix 4 — Floating Action Button: gradient + shadow + hover scale */}
       <button 
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-8 right-8 md:bottom-12 md:right-12 w-16 h-16 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-xl shadow-indigo-600/30 hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all focus:outline-none focus:ring-4 focus:ring-indigo-300 z-40 group"
+        className="fixed bottom-8 right-8 md:bottom-12 md:right-12 w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/50 hover:scale-110 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300 z-40 group"
         aria-label="Add New Habit"
       >
         <svg className="w-8 h-8 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +189,7 @@ export default function DashboardPage() {
         </svg>
       </button>
 
-      {/* Extracted Add Habit Modal rendering context logic map */}
+      {/* Add Habit Modal — Fix 4: backdrop blur, rounded-3xl, indigo top border */}
       <AddHabitModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 

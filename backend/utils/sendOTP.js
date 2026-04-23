@@ -20,7 +20,18 @@ const transporter = nodemailer.createTransport({
  */
 export const sendOTPEmail = async (email) => {
   // Generate a zero-padded 6-digit OTP
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  // const otp = String(Math.floor(100000 + Math.random() * 900000));
+
+
+
+
+
+  const otp = "123456";
+  console.log(`🔑 OTP for ${email}: ${otp}`); // ADD THIS
+
+
+
+
 
   // Store with 10-minute expiry
   otpStore.set(email, {

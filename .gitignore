@@ -22,3 +22,28 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (VERY IMPORTANT)
+.env
+.env.*
+!.env.example
+
+# Backend env
+backend/.env
+
+# Frontend env (Vite)
+frontend/.env
+frontend/.env.*
+
+# Build outputs (frontend/backend)
+build/
+frontend/dist/
+backend/dist/
+
+# Node modules (ensure both ignored)
+backend/node_modules/
+frontend/node_modules/
+
+# Temporary files
+.tmp/
+.cache/

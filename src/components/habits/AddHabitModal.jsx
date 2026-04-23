@@ -57,10 +57,10 @@ export default function AddHabitModal({ isOpen, onClose, defaultTrackingPeriod =
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pt-4 pb-0 sm:p-4">
       <div 
-        className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" 
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
         onClick={onClose}
       ></div>
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md p-6 sm:p-8 relative z-10 shadow-2xl animate-in fade-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md p-6 sm:p-8 relative z-10 shadow-2xl border-t-4 border-indigo-500 animate-in fade-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         
         <button 
           onClick={onClose}
