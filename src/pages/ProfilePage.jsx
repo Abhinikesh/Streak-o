@@ -117,6 +117,71 @@ export default function ProfilePage() {
     navigator.clipboard.writeText(url).then(() => toast('Link copied! 📋'));
   };
 
+  // ── My Habits ─────────────────────────────────────────────────────────────
+  const HABIT_ICONS = ['💪', '📚', '🧘', '🏃', '💧', '🥗', '😴', '✍️', '🎯', '🎸', '🧹', '💊', '🌅', '🧠', '🏋️', '🎨'];
+
+  const { data: habitsData = [], isLoading: habitsLoading, refetch: refetchHabits } = useQuery({
+    queryKey: ['habits'],
+    queryFn: async () => {
+      const res = await api.get('/api/habits');
+      return res.data.habits || res.data || [];
+    },
+    staleTime: 30_000,
+  });
+  const habits = Array.isArray(habitsData) ? habitsData : [];
+
+  const [showAddRow,   setShowAddRow]   = useState(false);
+  const [newHabitName, setNewHabitName] = useState('');
+  const [newHabitIcon, setNewHabitIcon] = useState('💪');
+  const [deletingId,   setDeletingId]   = useState(null);
+  const addRowRef = useRef(null);
+
+  // Close add-row on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') { setShowAddRow(false); setNewHabitName(''); setNewHabitIcon('💪'); } };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const addHabitMut = useMutation({
+    mutationFn: (payload) => api.post('/api/habits', payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      setShowAddRow(false);
+      setNewHabitName('');
+      setNewHabitIcon('💪');
+      toast.success('Habit added! 🎯');
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to add habit'),
+  });
+
+  const deleteHabitMut = useMutation({
+    mutationFn: (id) => api.delete(`/api/habits/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      setDeletingId(null);
+      toast.success('Habit removed');
+    },
+    onError: () => { setDeletingId(null); toast.error('Failed to remove habit'); },
+  });
+
+  const handleAddHabit = () => {
+    const name = newHabitName.trim();
+    if (!name) { toast.error('Please enter a habit name'); return; }
+    addHabitMut.mutate({
+      name,
+      icon: newHabitIcon,
+      colorHex: '#4F46E5',
+      trackingPeriod: Number(localStorage.getItem('defaultTrackingPeriod')) || 30,
+    });
+  };
+
+  const handleDeleteHabit = (id) => {
+    if (!window.confirm('Remove this habit? This cannot be undone.')) return;
+    setDeletingId(id);
+    deleteHabitMut.mutate(id);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 pb-24 text-gray-900 dark:text-white">
       <Navbar />
@@ -277,6 +342,132 @@ export default function ProfilePage() {
               <a href="/friends" className="text-indigo-500 hover:underline">Friends page</a>{' '}
               to enable it.
             </p>
+          )}
+        </section>
+
+        {/* ──────────────────────────────────────────────────────────────────── */}
+        {/* SECTION 3.5 — My Habits                                              */}
+        {/* ──────────────────────────────────────────────────────────────────── */}
+        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <h2 className="text-base font-bold mb-4 pb-3 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+            <span>✏️</span> My Habits
+          </h2>
+
+          {/* Loading skeleton */}
+          {habitsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-14 bg-gray-100 dark:bg-gray-700 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : habits.length === 0 && !showAddRow ? (
+            /* Empty state */
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="text-5xl mb-3">🌱</div>
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No habits yet.</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Add your first one below.</p>
+            </div>
+          ) : (
+            /* Habit rows */
+            <div className="space-y-2">
+              {habits.map(habit => (
+                <div
+                  key={habit._id}
+                  className="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  style={{ borderLeft: `4px solid ${habit.colorHex || '#4F46E5'}` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl w-9 h-9 flex items-center justify-center bg-white dark:bg-gray-700 rounded-full shadow-sm shrink-0">
+                      {habit.icon || '🎯'}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-sm text-gray-900 dark:text-white leading-tight">{habit.name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        {habit.trackingPeriod ? `${habit.trackingPeriod}-day goal` : 'Active'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteHabit(habit._id)}
+                    disabled={deletingId === habit._id}
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-40"
+                    title="Remove habit"
+                    aria-label="Delete habit"
+                  >
+                    {deletingId === habit._id ? (
+                      <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Inline add row */}
+          {showAddRow && (
+            <div
+              ref={addRowRef}
+              className="mt-3 p-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/10 space-y-3"
+            >
+              {/* Icon picker */}
+              <div className="flex flex-wrap gap-2">
+                {HABIT_ICONS.map(icon => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setNewHabitIcon(icon)}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-xl transition-all ${
+                      newHabitIcon === icon
+                        ? 'bg-indigo-600 shadow-md scale-110'
+                        : 'bg-white dark:bg-gray-700 hover:scale-105 shadow-sm'
+                    }`}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+              {/* Name input + confirm */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Habit name…"
+                  value={newHabitName}
+                  onChange={e => setNewHabitName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddHabit(); }}
+                  maxLength={60}
+                  className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white placeholder-gray-400"
+                />
+                <button
+                  onClick={handleAddHabit}
+                  disabled={addHabitMut.isPending}
+                  className="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all text-sm disabled:opacity-60"
+                >
+                  {addHabitMut.isPending ? 'Adding…' : 'Add'}
+                </button>
+                <button
+                  onClick={() => { setShowAddRow(false); setNewHabitName(''); setNewHabitIcon('💪'); }}
+                  className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold px-3 py-2 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Add new habit button */}
+          {!showAddRow && (
+            <button
+              onClick={() => setShowAddRow(true)}
+              className="mt-4 w-full py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:border-indigo-500 dark:hover:text-indigo-400 transition-all"
+            >
+              + Add New Habit
+            </button>
           )}
         </section>
 
