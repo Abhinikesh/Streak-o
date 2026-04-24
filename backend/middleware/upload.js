@@ -4,7 +4,7 @@ import streamifier from 'streamifier';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // increased to 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (allowed.includes(file.mimetype)) {
@@ -23,14 +23,8 @@ export const uploadToCloudinary = (buffer) => {
       'ml_default',
       { resource_type: 'auto' },
       (error, result) => {
-        if (error) {
-          console.log('=== CLOUDINARY UPLOAD ERROR ===');
-          console.log(JSON.stringify(error, null, 2));
-          reject(error);
-        } else {
-          console.log('=== CLOUDINARY SUCCESS ===', result.secure_url);
-          resolve(result);
-        }
+        if (error) reject(error);
+        else resolve(result);
       }
     );
   });
