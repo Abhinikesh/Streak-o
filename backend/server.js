@@ -9,6 +9,7 @@ import logRoutes from "./routes/logs.js";
 import socialRoutes from "./routes/social.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
 import notificationRoutes from "./routes/notifications.js";
+import userRoutes from "./routes/user.js";
 import { startReminderJob } from "./jobs/reminderJob.js";
 
 // Load environment variables
@@ -47,6 +48,7 @@ app.use("/api/logs",   logRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/leaderboard",    leaderboardRoutes);
 app.use("/api/notifications",  notificationRoutes);
+app.use("/api/user",           userRoutes);
 
 // ── Health check ───────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
