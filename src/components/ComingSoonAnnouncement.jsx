@@ -24,9 +24,9 @@ const FEATURES = [
     emoji: '🏆',
     name: '100-Day Rewards',
     desc: 'Complete streaks, earn badges',
-    badge: 'Soon',
-    badgeColor: '#a78bfa',
-    badgeBg: 'rgba(167,139,250,0.15)',
+    badge: 'NEW ✨',
+    badgeColor: '#22c55e',
+    badgeBg: 'rgba(34,197,94,0.15)',
   },
   {
     emoji: '📱',
@@ -55,7 +55,7 @@ const FEATURES = [
 ];
 
 const MARQUEE_TEXT =
-  '🚀 Coming Soon: 💬 Personal Chat  •  🏆 100-Day Streak Rewards  •  📱 Mobile App  •  🔔 Tap-to-Mark Notifications  •  🌐 Browser Extension  •  👥 Friend Activity Alerts  •  ';
+  '🚀 Coming Soon: 💬 Personal Chat  •  🎉 NEW: 🏆 100-Day Streak Rewards  •  📱 Mobile App  •  🔔 Tap-to-Mark Notifications  •  🌐 Browser Extension  •  👥 Friend Activity Alerts  •  ';
 
 // ─── CSS injected once ───────────────────────────────────────────────────────
 const CSS = `
