@@ -109,13 +109,13 @@ export default function DashboardPage() {
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-10">
 
         {/* Header card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-indigo-100 dark:border-gray-700 px-6 py-5 mb-6 flex items-center justify-between">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-indigo-100 dark:border-gray-700 px-4 sm:px-6 py-4 sm:py-5 mb-6 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Today</h1>
-            <p className="text-base font-medium text-gray-600 dark:text-gray-300 mt-0.5">{dateDisplay}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Today</h1>
+            <p className="text-sm sm:text-base font-medium text-gray-600 dark:text-gray-300 mt-0.5">{dateDisplay}</p>
           </div>
-          <p className="text-base font-medium text-indigo-600 dark:text-indigo-400 text-right">
-            {greeting},<br className="hidden sm:block" />{' '}
+          <p className="text-sm sm:text-base font-medium text-indigo-600 dark:text-indigo-400 text-right">
+            {greeting},{' '}
             <span className="text-indigo-700 dark:text-indigo-300 font-bold">
               {user?.firstName || user?.name?.split(' ')[0] || 'User'}!
             </span>

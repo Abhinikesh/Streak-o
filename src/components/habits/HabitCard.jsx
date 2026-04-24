@@ -91,17 +91,17 @@ export default function HabitCard({ habit, todayLog, allLogs = [], onLog, isUpda
     >
       {/* Main row */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-        <div className="flex items-center gap-4">
-          <div className="text-3xl bg-white/70 dark:bg-gray-700/70 rounded-full w-12 h-12 flex items-center justify-center shrink-0 shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="text-2xl sm:text-3xl bg-white/70 dark:bg-gray-700/70 rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 shadow-sm">
             {habit.icon || '🎯'}
           </div>
-          <div>
-            <h3 className="font-bold text-base text-gray-900 dark:text-white leading-tight mb-0.5">{habit.name}</h3>
+          <div className="min-w-0">
+            <h3 className="font-bold text-base text-gray-900 dark:text-white leading-tight mb-0.5 truncate">{habit.name}</h3>
             <p className="text-xs sm:text-sm">{statusText}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           {/* Tick */}
           <button
             onClick={() => onLog(habit._id, 'done')}

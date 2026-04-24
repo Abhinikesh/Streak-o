@@ -10,6 +10,7 @@
 
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
@@ -17,10 +18,21 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background-color: white;
     color: #111827;
+    overflow-x: hidden;
   }
 
   .dark body {
     background-color: #111827;
     color: #f9fafb;
   }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+/* Hide scrollbar but keep scrollability */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }

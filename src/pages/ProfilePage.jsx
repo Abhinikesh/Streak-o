@@ -432,7 +432,7 @@ export default function ProfilePage() {
                 ))}
               </div>
               {/* Name input + confirm */}
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   autoFocus
@@ -441,21 +441,23 @@ export default function ProfilePage() {
                   onChange={e => setNewHabitName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleAddHabit(); }}
                   maxLength={60}
-                  className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white placeholder-gray-400"
+                  className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-white placeholder-gray-400"
                 />
-                <button
-                  onClick={handleAddHabit}
-                  disabled={addHabitMut.isPending}
-                  className="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all text-sm disabled:opacity-60"
-                >
-                  {addHabitMut.isPending ? 'Adding…' : 'Add'}
-                </button>
-                <button
-                  onClick={() => { setShowAddRow(false); setNewHabitName(''); setNewHabitIcon('💪'); }}
-                  className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold px-3 py-2 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm"
-                >
-                  ✕
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddHabit}
+                    disabled={addHabitMut.isPending}
+                    className="flex-1 sm:flex-none bg-indigo-600 text-white font-semibold px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition-all text-sm disabled:opacity-60 min-h-[44px]"
+                  >
+                    {addHabitMut.isPending ? 'Adding…' : 'Add'}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddRow(false); setNewHabitName(''); setNewHabitIcon('💪'); }}
+                    className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm min-h-[44px]"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
           )}

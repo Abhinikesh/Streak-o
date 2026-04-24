@@ -257,7 +257,10 @@ function ListRow({ person, rank, isDark, onNavigate }) {
 
 function StatCell({ label, value, color, isDark, hideOnMobile }) {
   return (
-    <div style={{ textAlign: 'center', minWidth: 44, display: hideOnMobile ? undefined : undefined }}>
+    <div style={{
+      textAlign: 'center',
+      minWidth: 44,
+    }} className={hideOnMobile ? 'hidden sm:block' : ''}>
       <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color }}>{value}</p>
       <p style={{ margin: 0, fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#9ca3af' }}>{label}</p>
     </div>
