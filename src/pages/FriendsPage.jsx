@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
@@ -35,15 +35,24 @@ export default function FriendsPage() {
   // ── Mutations ──────────────────────────────────────────────
   const enableMut = useMutation({
     mutationFn: () => api.post('/api/social/enable'),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['shareInfo'] }); toast.success('Public profile enabled!'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['shareInfo'] }); toast.success('Profile is now public! 🌐'); },
     onError: (e) => toast.error(e.response?.data?.message || 'Failed to enable sharing'),
   });
 
   const disableMut = useMutation({
     mutationFn: () => api.post('/api/social/disable'),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['shareInfo'] }); toast('Profile hidden.'); },
-    onError: () => toast.error('Failed to disable sharing'),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['shareInfo'] }); toast('Profile set to private.'); },
+    onError: () => toast.error('Failed to update sharing'),
   });
+
+  // ── Auto-enable if no shareCode yet (silent, no toast) ─────
+  useEffect(() => {
+    if (!shareLoading && shareInfo && !shareInfo.shareCode) {
+      api.post('/api/social/enable').then(() => {
+        queryClient.invalidateQueries({ queryKey: ['shareInfo'] });
+      }).catch(() => {});
+    }
+  }, [shareLoading, shareInfo, queryClient]);
 
   const addFriendMut = useMutation({
     mutationFn: (shareCode) => api.post('/api/social/friends/add', { shareCode }),
@@ -98,35 +107,85 @@ export default function FriendsPage() {
 
         {/* ── Section 1: Share Link ── */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 border-b border-gray-100 dark:border-gray-700 pb-3">Your public profile</h2>
-          {shareLoading ? <Spinner size="sm" /> : shareInfo.isProfilePublic ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-gray-50 dark:bg-gray-700 rounded-xl px-4 py-3 font-mono text-sm text-gray-800 dark:text-gray-200 truncate">
-                  {CLIENT_URL}/u/{shareInfo.shareCode}
-                </code>
-                <button onClick={copyLink} className="shrink-0 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition-all">
-                  Copy
-                </button>
-              </div>
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-gray-700 pb-3 gap-3 flex-wrap">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Your public profile</h2>
+            {!shareLoading && shareInfo.isProfilePublic ? (
+              <span className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-bold px-3 py-1 rounded-full border border-green-200 dark:border-green-800">
+                🌐 Your profile is public
+              </span>
+            ) : !shareLoading ? (
+              <span className="inline-flex items-center gap-1.5 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 text-xs font-bold px-3 py-1 rounded-full border border-yellow-200 dark:border-yellow-800">
+                🔒 Private
+              </span>
+            ) : null}
+          </div>
+
+          {shareLoading ? <Spinner size="sm" /> : (
+            <div className="space-y-4">
+
+              {/* Warning banner when private */}
+              {!shareInfo.isProfilePublic && (
+                <div className="flex items-start gap-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl px-4 py-3">
+                  <span className="text-lg shrink-0">⚠️</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+                      Your profile is currently private — you won't appear on the Leaderboard
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Share link — always shown once shareCode exists */}
+              {shareInfo.shareCode ? (
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-gray-50 dark:bg-gray-700 rounded-xl px-4 py-3 font-mono text-sm text-gray-800 dark:text-gray-200 truncate">
+                    {CLIENT_URL}/u/{shareInfo.shareCode}
+                  </code>
+                  <button
+                    onClick={copyLink}
+                    className="shrink-0 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition-all"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl px-4 py-3">
+                  <p className="text-sm text-gray-400 dark:text-gray-500 font-mono">Generating your share link…</p>
+                </div>
+              )}
+
+              {/* Action row */}
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => window.open(`/u/${shareInfo.shareCode}`, '_blank')}
-                  className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                  View my public profile ↗
-                </button>
-                <button onClick={() => disableMut.mutate()} disabled={disableMut.isPending}
-                  className="text-sm font-medium text-red-500 dark:text-red-400 hover:underline disabled:opacity-60">
-                  Disable sharing
-                </button>
+                {shareInfo.shareCode && (
+                  <button
+                    onClick={() => window.open(`/u/${shareInfo.shareCode}`, '_blank')}
+                    className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    View my public profile ↗
+                  </button>
+                )}
+
+                {shareInfo.isProfilePublic ? (
+                  /* Subtle secondary button — not prominent */
+                  <button
+                    onClick={() => disableMut.mutate()}
+                    disabled={disableMut.isPending}
+                    className="ml-auto text-xs font-medium text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-600 px-3 py-1.5 rounded-lg hover:text-red-500 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-700 transition-all disabled:opacity-50"
+                  >
+                    {disableMut.isPending ? 'Updating…' : 'Make Private'}
+                  </button>
+                ) : (
+                  /* Prominent CTA */
+                  <button
+                    onClick={() => enableMut.mutate()}
+                    disabled={enableMut.isPending}
+                    className="ml-auto bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all disabled:opacity-60 shadow-md"
+                  >
+                    {enableMut.isPending ? 'Updating…' : '🌐 Make Public'}
+                  </button>
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Share your habit progress with friends — enable your public profile.</p>
-              <button onClick={() => enableMut.mutate()} disabled={enableMut.isPending}
-                className="bg-indigo-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-70">
-                {enableMut.isPending ? 'Enabling...' : '✨ Enable public profile'}
-              </button>
             </div>
           )}
         </section>
