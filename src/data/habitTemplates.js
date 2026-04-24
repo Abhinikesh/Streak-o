@@ -26,6 +26,8 @@ export const habitTemplates = [
   { id: 18, name: 'Call Family', icon: '📞', colorHex: '#10B981', trackingPeriod: 30, category: 'Personal' },
   { id: 19, name: 'Gratitude Practice', icon: '🙏', colorHex: '#EC4899', trackingPeriod: 30, category: 'Personal' },
   { id: 20, name: 'Cold Shower', icon: '🚿', colorHex: '#3B82F6', trackingPeriod: 30, category: 'Personal' },
+  { id: 21, name: 'Solve DSA Problem', icon: '🧠', colorHex: '#6366f1', trackingPeriod: 30, category: 'Learning' },
+  { id: 22, name: 'Practice System Design', icon: '🏗️', colorHex: '#6366f1', trackingPeriod: 30, category: 'Learning' },
 ];
 
 export const templateCategories = ['All', 'Health', 'Mind', 'Learning', 'Work', 'Personal'];
