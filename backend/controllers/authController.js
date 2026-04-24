@@ -2,6 +2,16 @@ import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
 import { sendOTPEmail, verifyOTP } from "../utils/sendOTP.js";
 
+// ── Helper: generate a unique share code ──────────────────────────────────────
+function buildShareCode(nameOrEmail) {
+  const base = (nameOrEmail || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 10);
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${base}-${suffix}`;
+}
+
 // ── POST /api/auth/request-otp ─────────────────────────────────
 /**
  * Accepts { email }. If the user doesn't exist, creates a shell document.
@@ -18,7 +28,13 @@ export const requestOTP = async (req, res) => {
     // Find or create user (OTP users may not have a name yet)
     let user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      user = await User.create({ email: email.toLowerCase(), name: email.split("@")[0] });
+      const name = email.split("@")[0];
+      user = await User.create({
+        email: email.toLowerCase(),
+        name,
+        isProfilePublic: true,
+        shareCode: buildShareCode(name),
+      });
     }
 
     await sendOTPEmail(email.toLowerCase());
@@ -51,7 +67,17 @@ export const verifyOTPLogin = async (req, res) => {
     // Fetch or create user
     let user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      user = await User.create({ email: email.toLowerCase(), name: email.split("@")[0] });
+      const name = email.split("@")[0];
+      user = await User.create({
+        email: email.toLowerCase(),
+        name,
+        isProfilePublic: true,
+        shareCode: buildShareCode(name),
+      });
+    } else if (!user.shareCode) {
+      // Backfill shareCode for existing users that were created before this feature
+      user.shareCode = buildShareCode(user.name || user.email);
+      await user.save();
     }
 
     const token = generateToken({ id: user._id, email: user.email });

@@ -1,372 +1,497 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, Link } from 'react-router-dom';
-import axios from '../api/axios';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 import Navbar from '../components/layout/Navbar';
+import { useTheme } from '../context/ThemeContext';
 
-// ── Spinner ───────────────────────────────────────────────────────────────────
-function Spinner() {
-  return (
-    <div className="flex justify-center items-center py-20">
-      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+// ─── Sort options ─────────────────────────────────────────────────────────────
+const SORT_OPTIONS = [
+  { key: 'longestStreak', label: '🔥 Best Streak' },
+  { key: 'overallRate',   label: '📊 Overall Rate' },
+  { key: 'totalDone',     label: '✅ Total Done'   },
+];
+
+// ─── Avatar circle ────────────────────────────────────────────────────────────
+const AVATAR_COLORS = [
+  '#6366f1','#8b5cf6','#ec4899','#f59e0b',
+  '#10b981','#3b82f6','#ef4444','#14b8a6',
+];
+function avatarColor(name = '') {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
-function Avatar({ person, size = 'md' }) {
-  const sizeClass = size === 'lg' ? 'w-20 h-20 text-2xl' : size === 'sm' ? 'w-10 h-10 text-sm' : 'w-16 h-16 text-xl';
-  const initial = (person.name || '?').charAt(0).toUpperCase();
-  if (person.avatar) {
-    return (
-      <img
-        src={person.avatar}
-        alt={person.name}
-        className={`${sizeClass} rounded-full object-cover`}
-      />
-    );
-  }
-  return (
-    <div className={`${sizeClass} rounded-full bg-indigo-500 dark:bg-indigo-600 text-white flex items-center justify-center font-bold`}>
-      {initial}
-    </div>
-  );
-}
-
-// ── Stat Label ─────────────────────────────────────────────────────────────────
-function sortLabel(sortKey, person) {
-  switch (sortKey) {
-    case 'currentStreak': return `${person.currentStreak} day streak`;
-    case 'bestStreak':    return `${person.bestStreak} best streak`;
-    case 'thisWeekDone':  return `${person.thisWeekDone} this week`;
-    case 'overallRate':   return `${person.overallRate}% rate`;
-    case 'totalDone':     return `${person.totalDone} total done`;
-    default:              return `${person.currentStreak} day streak`;
-  }
-}
-
-// ── Podium ────────────────────────────────────────────────────────────────────
-function Podium({ sorted, sortKey }) {
-  if (sorted.length < 3) return null;
-
-  const first  = sorted[0];
-  const second = sorted[1];
-  const third  = sorted[2];
-
-  const PodiumCol = ({ person, rank, pillarClass, pillarH, avatarSize, medalEmoji, ringColor }) => {
-    const extraGlow = person.isCurrentUser ? ' ring-offset-2 ring-2 ring-indigo-400' : '';
-    return (
-      <div className="flex flex-col items-center gap-1">
-        <span className="text-2xl">{medalEmoji}</span>
-        <div className={`relative rounded-full ring-4 ${ringColor}${extraGlow}`}>
-          <Avatar person={person} size={avatarSize} />
-        </div>
-        <p className="text-sm font-bold text-gray-900 dark:text-white text-center mt-1 max-w-[80px] truncate">{person.name}</p>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">{sortLabel(sortKey, person)}</p>
-        <div className={`w-20 ${pillarH} ${pillarClass} rounded-t-lg mt-2`} />
-      </div>
-    );
+function AvatarCircle({ name, avatar, size = 40 }) {
+  const initial = (name || '?').charAt(0).toUpperCase();
+  const style = {
+    width: size, height: size, borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontWeight: 700, fontSize: size * 0.38, color: '#fff', flexShrink: 0,
+    background: avatar ? undefined : avatarColor(name),
+    overflow: 'hidden',
   };
+  if (avatar) {
+    return (
+      <div style={style}>
+        <img src={avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    );
+  }
+  return <div style={style}>{initial}</div>;
+}
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function SkeletonRow({ isDark }) {
+  const bg = isDark ? 'rgba(255,255,255,0.07)' : '#f3f4f6';
+  const pulse = {
+    background: isDark
+      ? 'linear-gradient(90deg,rgba(255,255,255,0.04),rgba(255,255,255,0.1),rgba(255,255,255,0.04))'
+      : 'linear-gradient(90deg,#f3f4f6,#e5e7eb,#f3f4f6)',
+    backgroundSize: '200% 100%',
+    animation: 'lbSkeletonPulse 1.4s ease-in-out infinite',
+    borderRadius: 8,
+  };
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 mb-6">
-      <h3 className="text-center text-sm font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-6">Top 3</h3>
-      <div className="flex items-end justify-center gap-4 sm:gap-8">
-        {/* 2nd */}
-        <PodiumCol
-          person={second}
-          rank={2}
-          pillarClass="bg-gradient-to-t from-gray-300 to-gray-200 dark:from-gray-500 dark:to-gray-400"
-          pillarH="h-24"
-          avatarSize="md"
-          medalEmoji="🥈"
-          ringColor="ring-gray-300 dark:ring-gray-500"
-        />
-        {/* 1st */}
-        <PodiumCol
-          person={first}
-          rank={1}
-          pillarClass="bg-gradient-to-t from-yellow-400 to-yellow-300"
-          pillarH="h-32"
-          avatarSize="lg"
-          medalEmoji="🥇"
-          ringColor="ring-yellow-400"
-        />
-        {/* 3rd */}
-        <PodiumCol
-          person={third}
-          rank={3}
-          pillarClass="bg-gradient-to-t from-amber-600 to-amber-500"
-          pillarH="h-20"
-          avatarSize="md"
-          medalEmoji="🥉"
-          ringColor="ring-amber-600"
-        />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px',
+      borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f3f4f6'}` }}>
+      <div style={{ ...pulse, width: 28, height: 16 }} />
+      <div style={{ ...pulse, width: 40, height: 40, borderRadius: '50%', flexShrink: 0 }} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ ...pulse, height: 14, width: '45%' }} />
+        <div style={{ ...pulse, height: 11, width: '25%' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 20 }}>
+        {[60, 50, 50].map((w, i) => (
+          <div key={i} style={{ ...pulse, width: w, height: 14 }} />
+        ))}
       </div>
     </div>
   );
 }
 
-// ── Your Stats Card ────────────────────────────────────────────────────────────
-function YourStatsCard({ me, rank }) {
-  if (!me) return null;
-
-  let motivation = '💪 Keep pushing, you\'re climbing!';
-  if (rank === 1) motivation = '👑 You\'re leading the pack!';
-  else if (rank <= 3) motivation = '🔥 So close to the top!';
-
+function SkeletonPodium({ isDark }) {
+  const pulse = {
+    background: isDark
+      ? 'linear-gradient(90deg,rgba(255,255,255,0.04),rgba(255,255,255,0.1),rgba(255,255,255,0.04))'
+      : 'linear-gradient(90deg,#f3f4f6,#e5e7eb,#f3f4f6)',
+    backgroundSize: '200% 100%',
+    animation: 'lbSkeletonPulse 1.4s ease-in-out infinite',
+    borderRadius: 12,
+  };
+  const card = (h) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ ...pulse, width: 56, height: 56, borderRadius: '50%' }} />
+      <div style={{ ...pulse, width: 64, height: 12 }} />
+      <div style={{ ...pulse, width: 44, height: 10 }} />
+      <div style={{ ...pulse, width: 48, height: h }} />
+    </div>
+  );
   return (
-    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white mb-4 shadow-lg">
-      <p className="text-xs font-semibold opacity-75 uppercase tracking-widest mb-1">Your Ranking</p>
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-5xl font-black leading-none">#{rank}</p>
-          <p className="text-sm mt-1 opacity-90">{motivation}</p>
-        </div>
-        <div className="flex gap-4 sm:gap-6">
-          <div className="text-center">
-            <p className="text-2xl font-black">{me.currentStreak}</p>
-            <p className="text-xs opacity-75">Current</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-black">{me.bestStreak}</p>
-            <p className="text-xs opacity-75">Best</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-black">{me.thisWeekDone}</p>
-            <p className="text-xs opacity-75">This Week</p>
-          </div>
-        </div>
-      </div>
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 24, padding: '28px 20px' }}>
+      {card(80)}
+      {card(112)}
+      {card(64)}
     </div>
   );
 }
 
-// ── Row ───────────────────────────────────────────────────────────────────────
-function LeaderboardRow({ person, rank }) {
-  const rowBase = 'flex items-center px-4 sm:px-6 py-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors gap-3 sm:gap-4';
-  const rowHighlight = 'bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-indigo-500';
+// ─── Podium card ──────────────────────────────────────────────────────────────
+const MEDAL = ['🥇','🥈','🥉'];
+const BORDER_COLOR = ['#f59e0b','#94a3b8','#b45309'];
+const PILLAR_BG = [
+  'linear-gradient(180deg,#fbbf24,#f59e0b)',
+  'linear-gradient(180deg,#cbd5e1,#94a3b8)',
+  'linear-gradient(180deg,#d97706,#b45309)',
+];
+const PILLAR_H = [112, 80, 64];
+const AVATAR_SIZE = [72, 56, 48];
+
+function PodiumCard({ person, rank, isDark, onNavigate, sortKey }) {
+  const idx = rank - 1;
+  const isFirst = rank === 1;
+  const statValue = sortKey === 'longestStreak'
+    ? `🔥 ${person.longestStreak}`
+    : sortKey === 'overallRate'
+    ? `${person.overallRate}%`
+    : `✅ ${person.totalDone}`;
 
   return (
-    <div className={`${rowBase} ${person.isCurrentUser ? rowHighlight : ''}`}>
+    <div
+      onClick={() => person.shareCode && onNavigate(`/u/${person.shareCode}`)}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        cursor: person.shareCode ? 'pointer' : 'default',
+        gap: 6,
+      }}
+    >
+      <span style={{ fontSize: isFirst ? 28 : 22 }}>{MEDAL[idx]}</span>
+      <div style={{
+        padding: 3, borderRadius: '50%',
+        boxShadow: `0 0 0 3px ${BORDER_COLOR[idx]}`,
+        transition: 'transform 0.15s',
+      }}>
+        <AvatarCircle name={person.name} avatar={person.avatar} size={AVATAR_SIZE[idx]} />
+      </div>
+      <p style={{
+        margin: '4px 0 0', fontWeight: 700, fontSize: 13,
+        color: isDark ? '#fff' : '#111827',
+        maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        textAlign: 'center',
+      }}>
+        {person.name.slice(0, 12)}{person.name.length > 12 ? '…' : ''}
+      </p>
+      <p style={{ margin: 0, fontSize: 12, color: isDark ? 'rgba(255,255,255,0.55)' : '#6b7280', textAlign: 'center' }}>
+        {statValue}
+      </p>
+      {person.isCurrentUser && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+          background: 'rgba(99,102,241,0.2)', color: '#818cf8',
+        }}>You</span>
+      )}
+      {/* Pillar */}
+      <div style={{
+        width: 48, height: PILLAR_H[idx], marginTop: 6,
+        background: PILLAR_BG[idx], borderRadius: '8px 8px 0 0',
+      }} />
+    </div>
+  );
+}
+
+// ─── Ranked list row ──────────────────────────────────────────────────────────
+function ListRow({ person, rank, isDark, onNavigate }) {
+  const isYou = person.isCurrentUser;
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '13px 20px',
+        borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#f3f4f6'}`,
+        borderLeft: isYou ? '4px solid #6366f1' : '4px solid transparent',
+        background: isYou
+          ? isDark ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.05)'
+          : 'transparent',
+        transition: 'background 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!isYou) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : '#f9fafb';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.background = isYou
+          ? isDark ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.05)'
+          : 'transparent';
+      }}
+    >
       {/* Rank */}
-      <span className="w-7 text-sm font-bold text-gray-400 dark:text-gray-500 shrink-0">{rank}</span>
+      <span style={{ width: 28, fontWeight: 700, fontSize: 13, color: isDark ? 'rgba(255,255,255,0.35)' : '#9ca3af', flexShrink: 0 }}>
+        #{rank}
+      </span>
 
-      {/* Avatar */}
-      <div className="shrink-0">
-        <Avatar person={person} size="sm" />
-      </div>
-
-      {/* Name */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          {person.shareCode && !person.isCurrentUser ? (
-            <a
-              href={`/u/${person.shareCode}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate"
+      {/* Avatar + Name */}
+      <AvatarCircle name={person.name} avatar={person.avatar} size={38} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {person.shareCode && !isYou ? (
+            <span
+              onClick={() => onNavigate(`/u/${person.shareCode}`)}
+              style={{ fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                color: isDark ? '#e2e8f0' : '#111827',
+                textDecoration: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#6366f1'}
+              onMouseLeave={e => e.currentTarget.style.color = isDark ? '#e2e8f0' : '#111827'}
             >
               {person.name}
-            </a>
+            </span>
           ) : (
-            <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{person.name}</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: isDark ? '#e2e8f0' : '#111827' }}>
+              {person.name}
+            </span>
           )}
-          {person.isCurrentUser && (
-            <span className="text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full shrink-0">
+          {isYou && (
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+              background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
               You
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{person.habitCount} habit{person.habitCount !== 1 ? 's' : ''}</p>
+        <p style={{ margin: '2px 0 0', fontSize: 11, color: isDark ? 'rgba(255,255,255,0.35)' : '#9ca3af' }}>
+          {person.totalHabits} habit{person.totalHabits !== 1 ? 's' : ''}
+        </p>
       </div>
 
-      {/* Stats — hide some on mobile */}
-      <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-        <div className="text-center">
-          <p className="text-sm font-bold text-orange-500 dark:text-orange-400">
-            {person.currentStreak > 0 ? `🔥 ${person.currentStreak}` : person.currentStreak}
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">Current</p>
-        </div>
-        <div className="text-center hidden sm:block">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{person.bestStreak}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Best</p>
-        </div>
-        <div className="text-center hidden md:block">
-          <p className="text-sm font-medium text-green-600 dark:text-green-400">{person.thisWeekDone}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Week</p>
-        </div>
-        <div className="text-center">
-          <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{person.overallRate}%</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">Rate</p>
-        </div>
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
+        <StatCell label="🔥 Streak" value={person.longestStreak} color="#f59e0b" isDark={isDark} />
+        <StatCell label="📊 Rate" value={`${person.overallRate}%`} color="#6366f1" isDark={isDark} hideOnMobile />
+        <StatCell label="✅ Done" value={person.totalDone} color="#10b981" isDark={isDark} hideOnMobile />
+        {person.shareCode && !isYou && (
+          <button
+            onClick={() => onNavigate(`/u/${person.shareCode}`)}
+            style={{
+              padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)',
+              color: '#6366f1', border: '1px solid rgba(99,102,241,0.3)',
+              cursor: 'pointer', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.25)'}
+            onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)'}
+          >
+            View →
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-// ── Rankings Table ─────────────────────────────────────────────────────────────
-function RankingsTable({ sorted, startRank = 1 }) {
-  if (sorted.length === 0) return null;
+function StatCell({ label, value, color, isDark, hideOnMobile }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center px-4 sm:px-6 py-3 bg-gray-50 dark:bg-gray-700/50 gap-3 sm:gap-4">
-        <span className="w-7 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider shrink-0">#</span>
-        <span className="flex-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Player</span>
-        <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Current</span>
-          <span className="hidden sm:block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Best</span>
-          <span className="hidden md:block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Week</span>
-          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Rate</span>
-        </div>
-      </div>
-      {sorted.map((person, i) => (
-        <LeaderboardRow key={person.userId} person={person} rank={startRank + i} />
-      ))}
+    <div style={{ textAlign: 'center', minWidth: 44, display: hideOnMobile ? undefined : undefined }}>
+      <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#9ca3af' }}>{label}</p>
     </div>
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function LeaderboardPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('friends');
-  const [sortKey, setSortKey]     = useState('currentStreak');
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
-  const { data: friendsBoard = [], isLoading: friendsLoading } = useQuery({
-    queryKey: ['leaderboard', 'friends'],
-    queryFn: () => axios.get('/api/leaderboard').then((r) => r.data),
+  const [sortKey, setSortKey] = useState('longestStreak');
+
+  // Inject skeleton keyframe once
+  React.useEffect(() => {
+    if (document.getElementById('lb-skeleton-style')) return;
+    const s = document.createElement('style');
+    s.id = 'lb-skeleton-style';
+    s.textContent = `
+      @keyframes lbSkeletonPulse {
+        0%   { background-position: 200% center; }
+        100% { background-position: -200% center; }
+      }
+    `;
+    document.head.appendChild(s);
+  }, []);
+
+  // ── Leaderboard data ──────────────────────────────────────────────────────
+  const {
+    data: board = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['social-leaderboard'],
+    queryFn: () => api.get('/api/social/leaderboard').then((r) => r.data),
+    staleTime: 60_000,
   });
 
-  const { data: globalBoard = [], isLoading: globalLoading } = useQuery({
-    queryKey: ['leaderboard', 'global'],
-    queryFn: () => axios.get('/api/leaderboard/global').then((r) => r.data),
+  // ── Current user's shareCode ──────────────────────────────────────────────
+  const { data: shareInfo } = useQuery({
+    queryKey: ['my-share-info'],
+    queryFn: () => api.get('/api/social/my-share').then((r) => r.data),
+    staleTime: 300_000,
   });
+  const myShareCode = shareInfo?.shareCode || null;
 
-  // ── Sorted arrays (client-side) ──────────────────────────────────────────
-  const sortedFriends = useMemo(
-    () => [...friendsBoard].sort((a, b) => b[sortKey] - a[sortKey]),
-    [friendsBoard, sortKey]
-  );
+  // ── Enrich + sort ─────────────────────────────────────────────────────────
+  const sorted = useMemo(() => {
+    const enriched = board.map((u) => ({
+      ...u,
+      isCurrentUser: !!(myShareCode && u.shareCode === myShareCode),
+    }));
+    return [...enriched].sort((a, b) => b[sortKey] - a[sortKey]);
+  }, [board, myShareCode, sortKey]);
 
-  const sortedGlobal = useMemo(
-    () => [...globalBoard].sort((a, b) => b[sortKey] - a[sortKey]),
-    [globalBoard, sortKey]
-  );
+  const podium = sorted.slice(0, 3);
+  const rest   = sorted.slice(3);
 
-  // ── Find current user in friends board ───────────────────────────────────
-  const meIndex = sortedFriends.findIndex((p) => p.isCurrentUser);
-  const me      = meIndex >= 0 ? sortedFriends[meIndex] : null;
-  const myRank  = meIndex + 1;
-
-  // For Friends tab: podium gets top-3, list starts at rank 4
-  const friendsPodium  = sortedFriends.slice(0, 3);
-  const friendsRest    = sortedFriends.length >= 3 ? sortedFriends.slice(3) : sortedFriends;
-  const friendsRestStart = sortedFriends.length >= 3 ? 4 : 1;
-
-  const isLoading = activeTab === 'friends' ? friendsLoading : globalLoading;
+  // ── Theme tokens ──────────────────────────────────────────────────────────
+  const cardBg     = isDark ? 'rgba(255,255,255,0.04)' : '#ffffff';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.09)' : '#e5e7eb';
+  const titleColor = isDark ? '#fff' : '#111827';
+  const subtitleColor = isDark ? 'rgba(255,255,255,0.5)' : '#6b7280';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+    <div style={{ minHeight: '100vh', background: isDark ? undefined : '#f9fafb' }}>
       <Navbar />
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Leaderboard 🏆</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Compete with friends and the world</p>
+      {/* Inject keyframe for skeleton */}
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 16px' }}>
+
+        {/* ── Header ───────────────────────────────────────────────────── */}
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: titleColor, letterSpacing: '-0.5px' }}>
+            🏆 Leaderboard
+          </h1>
+          <p style={{ margin: '4px 0 0', fontSize: 14, color: subtitleColor }}>
+            Top StreakBoard users ranked by streak
+          </p>
         </div>
 
-        {/* Tab + Sort Row */}
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-          {/* Tab pills */}
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl p-1">
-            {['friends', 'global'].map((tab) => (
+        {/* ── Sort toggles ─────────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap',
+        }}>
+          {SORT_OPTIONS.map((opt) => {
+            const active = sortKey === opt.key;
+            return (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  activeTab === tab
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700'
-                }`}
+                key={opt.key}
+                onClick={() => setSortKey(opt.key)}
+                style={{
+                  padding: '8px 18px', borderRadius: 24, fontSize: 13, fontWeight: 600,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.18s',
+                  background: active
+                    ? 'linear-gradient(135deg,#6366f1,#8b5cf6)'
+                    : isDark ? 'rgba(255,255,255,0.07)' : '#fff',
+                  color: active ? '#fff' : isDark ? 'rgba(255,255,255,0.7)' : '#374151',
+                  boxShadow: active
+                    ? '0 4px 14px rgba(99,102,241,0.35)'
+                    : isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
+                  outline: active ? 'none' : `1px solid ${cardBorder}`,
+                }}
               >
-                {tab === 'friends' ? '👥 Friends' : '🌍 Global'}
+                {opt.label}
               </button>
-            ))}
-          </div>
-
-          {/* Sort selector */}
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value)}
-            className="text-sm font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-          >
-            <option value="currentStreak">Current Streak</option>
-            <option value="bestStreak">Best Streak Ever</option>
-            <option value="thisWeekDone">This Week</option>
-            <option value="overallRate">Overall Rate</option>
-            <option value="totalDone">Total Done</option>
-          </select>
+            );
+          })}
         </div>
 
-        {/* ── FRIENDS TAB ──────────────────────────────────────────────────── */}
-        {activeTab === 'friends' && (
+        {/* ── Loading ───────────────────────────────────────────────────── */}
+        {isLoading && (
           <>
-            {friendsLoading ? (
-              <Spinner />
-            ) : friendsBoard.length === 0 ? (
-              /* Empty state — no friends */
-              <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <p className="text-5xl mb-4">🤝</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white mb-2">No friends yet!</p>
-                <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">Add friends to see how you compare.</p>
-                <button
-                  onClick={() => navigate('/friends')}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-colors shadow-md"
-                >
-                  Go to Friends Page →
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Your Stats Card */}
-                {me && <YourStatsCard me={me} rank={myRank} />}
-
-                {/* Podium (only when 3+ people) */}
-                {sortedFriends.length >= 3 && (
-                  <Podium sorted={friendsPodium} sortKey={sortKey} />
-                )}
-
-                {/* Rankings list: rank 4+ (or rank 1+ if <3 total) */}
-                {friendsRest.length > 0 && (
-                  <RankingsTable sorted={friendsRest} startRank={friendsRestStart} />
-                )}
-              </>
-            )}
+            <div style={{
+              background: cardBg, border: `1px solid ${cardBorder}`,
+              borderRadius: 20, overflow: 'hidden', marginBottom: 16,
+            }}>
+              <SkeletonPodium isDark={isDark} />
+            </div>
+            <div style={{
+              background: cardBg, border: `1px solid ${cardBorder}`,
+              borderRadius: 20, overflow: 'hidden',
+            }}>
+              {[...Array(6)].map((_, i) => <SkeletonRow key={i} isDark={isDark} />)}
+            </div>
           </>
         )}
 
-        {/* ── GLOBAL TAB ───────────────────────────────────────────────────── */}
-        {activeTab === 'global' && (
-          <>
-            {globalLoading ? (
-              <Spinner />
-            ) : sortedGlobal.length === 0 ? (
-              <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <p className="text-5xl mb-4">🌐</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white mb-2">No public profiles yet</p>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
-                  Enable sharing in your profile to appear here!
-                </p>
-              </div>
-            ) : (
-              <RankingsTable sorted={sortedGlobal} startRank={1} />
-            )}
-          </>
+        {/* ── Error ────────────────────────────────────────────────────── */}
+        {isError && !isLoading && (
+          <div style={{
+            background: cardBg, border: `1px solid ${cardBorder}`,
+            borderRadius: 20, padding: '60px 20px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 40, margin: '0 0 12px' }}>⚠️</p>
+            <p style={{ fontWeight: 700, fontSize: 16, color: titleColor, margin: '0 0 6px' }}>
+              Failed to load leaderboard.
+            </p>
+            <p style={{ fontSize: 13, color: subtitleColor, margin: '0 0 20px' }}>
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={() => refetch()}
+              style={{
+                padding: '10px 24px', borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
         )}
+
+        {/* ── Empty ────────────────────────────────────────────────────── */}
+        {!isLoading && !isError && sorted.length === 0 && (
+          <div style={{
+            background: cardBg, border: `1px solid ${cardBorder}`,
+            borderRadius: 20, padding: '72px 20px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 48, margin: '0 0 14px' }}>🏆</p>
+            <p style={{ fontWeight: 700, fontSize: 17, color: titleColor, margin: '0 0 8px' }}>
+              No public profiles yet.
+            </p>
+            <p style={{ fontSize: 14, color: subtitleColor }}>
+              Be the first on the leaderboard!
+            </p>
+          </div>
+        )}
+
+        {/* ── Podium (top 3) ───────────────────────────────────────────── */}
+        {!isLoading && !isError && sorted.length >= 3 && (
+          <div style={{
+            background: cardBg, border: `1px solid ${cardBorder}`,
+            borderRadius: 20, marginBottom: 16, overflow: 'hidden',
+          }}>
+            <p style={{
+              textAlign: 'center', margin: '20px 0 0', fontSize: 11,
+              fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: subtitleColor,
+            }}>Top 3</p>
+            <div style={{
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+              gap: 24, padding: '16px 20px 28px',
+            }}>
+              {/* 2nd */}
+              <PodiumCard person={podium[1]} rank={2} isDark={isDark} onNavigate={navigate} sortKey={sortKey} />
+              {/* 1st */}
+              <PodiumCard person={podium[0]} rank={1} isDark={isDark} onNavigate={navigate} sortKey={sortKey} />
+              {/* 3rd */}
+              <PodiumCard person={podium[2]} rank={3} isDark={isDark} onNavigate={navigate} sortKey={sortKey} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Ranked list (4th+) ───────────────────────────────────────── */}
+        {!isLoading && !isError && sorted.length > 0 && (
+          <div style={{
+            background: cardBg, border: `1px solid ${cardBorder}`,
+            borderRadius: 20, overflow: 'hidden',
+          }}>
+            {/* Table header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 14,
+              padding: '10px 20px',
+              borderBottom: `1px solid ${cardBorder}`,
+              background: isDark ? 'rgba(255,255,255,0.03)' : '#f9fafb',
+            }}>
+              <span style={{ width: 28, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor }}>
+                #
+              </span>
+              <span style={{ flex: 1, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor, marginLeft: 52 }}>
+                Player
+              </span>
+              <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
+                {['🔥 Streak','📊 Rate','✅ Done'].map((h) => (
+                  <span key={h} style={{ minWidth: 44, textAlign: 'center', fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: subtitleColor }}>
+                    {h}
+                  </span>
+                ))}
+                {/* spacer for view button column */}
+                <span style={{ width: 60 }} />
+              </div>
+            </div>
+
+            {/* If fewer than 4, show all. Otherwise only show from rank 4 */}
+            {(sorted.length < 4 ? sorted : rest).map((person, i) => {
+              const rankNum = sorted.length < 4 ? i + 1 : i + 4;
+              return (
+                <ListRow
+                  key={person.shareCode || person.name + i}
+                  person={person}
+                  rank={rankNum}
+                  isDark={isDark}
+                  onNavigate={navigate}
+                />
+              );
+            })}
+          </div>
+        )}
+
       </div>
     </div>
   );

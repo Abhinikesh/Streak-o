@@ -5,6 +5,16 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import User from "../models/User.js";
 
+// ── Helper ────────────────────────────────────────────────────────────────
+function buildShareCode(nameOrEmail) {
+  const base = (nameOrEmail || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 10);
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${base}-${suffix}`;
+}
+
 passport.use(
   new GoogleStrategy(
     {
@@ -30,14 +40,21 @@ clientSecret: process.env.GOOGLE_CLIENT_SECRET,
           // Update googleId and avatar if missing
           if (!user.googleId) user.googleId = profile.id;
           if (!user.avatar && avatar) user.avatar = avatar;
+          // Backfill shareCode for existing users
+          if (!user.shareCode) {
+            user.shareCode = buildShareCode(user.name || user.email);
+            user.isProfilePublic = true;
+          }
           await user.save();
         } else {
-          // 3. Create a brand-new user
+          // 3. Create a brand-new user with public profile and shareCode
           user = await User.create({
             googleId: profile.id,
             email,
             name,
             avatar,
+            isProfilePublic: true,
+            shareCode: buildShareCode(name || email),
           });
         }
 

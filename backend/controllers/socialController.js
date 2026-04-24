@@ -206,3 +206,85 @@ export const removeFriend = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+// ── GET /api/social/leaderboard ────────────────────────────────
+export const getLeaderboard = async (req, res) => {
+  try {
+    const users = await User.find({
+      isProfilePublic: true,
+    }).select('name avatar shareCode createdAt');
+
+    const leaderboardData = await Promise.all(
+      users.map(async (user) => {
+        const habits = await Habit.find({
+          userId: user._id,
+          isActive: true,
+        });
+
+        const habitIds = habits.map((h) => h._id);
+
+        const logs = await HabitLog.find({
+          userId: user._id,
+          habitId: { $in: habitIds },
+        });
+
+        const doneLogs = logs.filter((l) => l.status === 'done');
+        const missedLogs = logs.filter((l) => l.status === 'missed');
+        const totalDone = doneLogs.length;
+        const totalMissed = missedLogs.length;
+        const overallRate =
+          totalDone + totalMissed > 0
+            ? Math.round((totalDone / (totalDone + totalMissed)) * 100)
+            : 0;
+
+        // Calculate longest streak across all habits
+        let longestStreak = 0;
+        habits.forEach((habit) => {
+          const habitDoneDates = logs
+            .filter(
+              (l) =>
+                l.habitId.toString() === habit._id.toString() &&
+                l.status === 'done'
+            )
+            .map((l) => l.date)
+            .sort();
+
+          let best = 0,
+            run = 0;
+          for (let i = 0; i < habitDoneDates.length; i++) {
+            if (i === 0) {
+              run = 1;
+              continue;
+            }
+            const prev = new Date(habitDoneDates[i - 1] + 'T00:00:00');
+            const curr = new Date(habitDoneDates[i] + 'T00:00:00');
+            const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+            run = diff === 1 ? run + 1 : 1;
+            if (run > best) best = run;
+          }
+          if (run > best) best = run;
+          if (best > longestStreak) longestStreak = best;
+        });
+
+        return {
+          name: user.name || 'StreakBoard User',
+          avatar: user.avatar || null,
+          shareCode: user.shareCode,
+          totalHabits: habits.length,
+          totalDone,
+          overallRate,
+          longestStreak,
+          memberSince: user.createdAt,
+        };
+      })
+    );
+
+    // Sort by longestStreak descending
+    leaderboardData.sort((a, b) => b.longestStreak - a.longestStreak);
+
+    res.json(leaderboardData);
+  } catch (err) {
+    console.error('getLeaderboard error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
