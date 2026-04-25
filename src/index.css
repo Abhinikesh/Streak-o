@@ -21,18 +21,113 @@
     overflow-x: hidden;
   }
 
+  /* ── Dark mode: near-black palette (Notion / Linear / Vercel style) ── */
   .dark body {
-    background-color: #111827;
-    color: #f9fafb;
+    background-color: #0a0a0a;
+    color: #f0f0f0;
   }
 
   img {
-    max-width: 100%;
+    max-width: 100%
   }
 }
 
-/* Hide scrollbar but keep scrollability */
+/* ── Dark mode CSS custom properties ────────────────────────────────────
+   Used by components that reference var(--card), var(--border) etc.
+   and by the overrides below.                                           */
+.dark {
+  --bg:               #0a0a0a;
+  --bg-secondary:     #111111;
+  --card:             #161616;
+  --card-hover:       #1c1c1c;
+  --border:           #2a2a2a;
+  --border-light:     #222222;
+
+  --text:             #f0f0f0;
+  --text-muted:       #888888;
+  --text-subtle:      #555555;
+
+  --primary:          #7c3aed;
+  --primary-hover:    #6d28d9;
+  --primary-light:    rgba(124, 58, 237, 0.15);
+
+  --input-bg:         #1a1a1a;
+  --input-border:     #2a2a2a;
+  --input-focus:      #7c3aed;
+
+  --navbar-bg:        #0d0d0d;
+  --navbar-border:    #1e1e1e;
+
+  --card-shadow:      0 1px 3px rgba(0, 0, 0, 0.4);
+  --card-shadow-hover:0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Override Tailwind dark:bg-gray-* to use true-dark palette ──────────
+   Tailwind's gray palette has a blue tint (gray-800 = #1f2937).
+   These overrides replace that with neutral near-blacks.               */
+
+/* Page / section backgrounds */
+.dark .dark\:bg-gray-900,
+.dark .dark\:from-gray-900,
+.dark .dark\:via-gray-900,
+.dark .dark\:to-gray-800,
+.dark .dark\:from-gray-800 {
+  background-color: #0a0a0a !important;
+}
+
+/* Card / panel backgrounds */
+.dark .dark\:bg-gray-800 {
+  background-color: #161616 !important;
+}
+
+/* Slightly elevated surfaces */
+.dark .dark\:bg-gray-700,
+.dark .dark\:bg-gray-700\/50 {
+  background-color: #1c1c1c !important;
+}
+
+/* Subtle fill (inputs, chips, tags) */
+.dark .dark\:bg-gray-600 {
+  background-color: #242424 !important;
+}
+
+/* Borders */
+.dark .dark\:border-gray-700 {
+  border-color: #2a2a2a !important;
+}
+.dark .dark\:border-gray-600 {
+  border-color: #333333 !important;
+}
+
+/* Text */
+.dark .dark\:text-white {
+  color: #f0f0f0 !important;
+}
+.dark .dark\:text-gray-200 {
+  color: #e0e0e0 !important;
+}
+.dark .dark\:text-gray-300 {
+  color: #c0c0c0 !important;
+}
+.dark .dark\:text-gray-400 {
+  color: #888888 !important;
+}
+.dark .dark\:text-gray-500 {
+  color: #666666 !important;
+}
+
+/* Remove gradient backgrounds from dark mode pages —
+   flat, clean, Notion-style                                            */
+.dark .bg-gradient-to-br,
+.dark .bg-gradient-to-r,
+.dark .bg-gradient-to-b {
+  background-image: none !important;
+  background-color: #0a0a0a !important;
+}
+
+/* ── Hide scrollbar but keep scrollability ─────────────────────────── */
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
