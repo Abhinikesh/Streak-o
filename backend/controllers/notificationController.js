@@ -144,9 +144,10 @@ export const sendFriendDigest = async () => {
       const payload = JSON.stringify({
         title: 'Your friends are crushing it! 💪',
         body: `${activeFriendCount} of your friend${activeFriendCount > 1 ? 's' : ''} completed habits today — don't break your streak!`,
-        icon:  '/icon-192.png',
-        badge: '/icon-192.png',
-        tag:   'friend-digest',
+        icon:     '/icon-192.png',
+        badge:    '/icon-192.png',
+        tag:      'friend-digest',
+        renotify: true,
         actions: [
           { action: 'mark-all-done', title: '✅ Mark All Done' },
           { action: 'open-app',      title: '📱 Open App'     },
@@ -244,11 +245,12 @@ export const sendGlobalReminders = async (type) => {
 
       const pendingCount = habitCount - doneCount;
       const payload = JSON.stringify({
-        title: notification.title,
-        body:  `${notification.body} (${pendingCount} habit${pendingCount > 1 ? 's' : ''} remaining)`,
-        icon:  '/icon-192.png',
-        badge: '/icon-192.png',
-        tag:   `global-${type}`,
+        title:    notification.title,
+        body:     `${notification.body} (${pendingCount} habit${pendingCount > 1 ? 's' : ''} remaining)`,
+        icon:     '/icon-192.png',
+        badge:    '/icon-192.png',
+        tag:      `global-${type}`,
+        renotify: true,
         actions: [
           { action: 'mark-all-done', title: '✅ Mark All Done' },
           { action: 'open-app',      title: '📱 Open App'     },
