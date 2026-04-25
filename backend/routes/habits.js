@@ -6,7 +6,6 @@ import {
   getHabitById,
   updateHabit,
   deleteHabit,
-  toggleHabitPrivacy,
 } from "../controllers/habitController.js";
 
 const router = express.Router();
@@ -28,8 +27,5 @@ router.put("/:id", updateHabit);
 
 // DELETE /api/habits/:id   → soft-delete a habit
 router.delete("/:id", deleteHabit);
-
-// PATCH  /api/habits/:id/privacy → toggle isPublic
-router.patch("/:id/privacy", toggleHabitPrivacy);
 
 export default router;

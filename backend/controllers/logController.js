@@ -1,6 +1,5 @@
 import HabitLog from "../models/HabitLog.js";
 import Habit from "../models/Habit.js";
-import User from "../models/User.js";
 import mongoose from "mongoose";
 
 // ── Helper: compute current streak for a habit from its logs ───
@@ -59,23 +58,6 @@ export const logHabit = async (req, res) => {
           });
           await habit.save();
         }
-      }
-      // ── Activity feed: push entry to user's recentActivity ──────
-      const habitForActivity = await Habit.findOne({ _id: habitId, userId: req.user.id });
-      if (habitForActivity) {
-        await User.findByIdAndUpdate(req.user.id, {
-          $push: {
-            recentActivity: {
-              $each: [{
-                habitName: habitForActivity.name,
-                habitIcon: habitForActivity.icon,
-                completedAt: new Date(),
-                isPublic: habitForActivity.isPublic ?? true,
-              }],
-              $slice: -20, // keep only latest 20
-            },
-          },
-        });
       }
     }
 

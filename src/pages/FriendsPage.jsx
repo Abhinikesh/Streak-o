@@ -9,28 +9,10 @@ import { useAuth } from '../context/AuthContext';
 const CLIENT_URL = window.location.origin;
 const MEDAL = ['🥇', '🥈', '🥉'];
 
-// ── Relative time helper ────────────────────────────────────────────
-function getRelativeTime(dateInput) {
-  const date = new Date(dateInput);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 30) return 'just now';
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-  if (diffDays === 1) return 'Yesterday';
-  return `${diffDays} days ago`;
-}
-
 export default function FriendsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [addCode, setAddCode] = useState('');
-  const [showAllActivity, setShowAllActivity] = useState(false);
 
   // ── Share info ─────────────────────────────────────────────
   const { data: shareInfo = {}, isLoading: shareLoading } = useQuery({
@@ -48,12 +30,6 @@ export default function FriendsPage() {
   const { data: myLogs = [] } = useQuery({
     queryKey: ['logs'],
     queryFn: async () => { const r = await api.get('/api/logs/all'); return r.data.logs || r.data || []; }
-  });
-
-  // ── Friend activity feed ───────────────────────────────────
-  const { data: activityFeed = [], isLoading: activityLoading } = useQuery({
-    queryKey: ['friendActivity'],
-    queryFn: async () => { const r = await api.get('/api/social/friends/activity'); return r.data; }
   });
 
   // ── Mutations ──────────────────────────────────────────────
@@ -137,70 +113,6 @@ export default function FriendsPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Friends</h1>
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">See how your friends are building habits</p>
         </div>
-
-        {/* ── Activity Feed ── */}
-        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 border-b border-gray-100 dark:border-gray-700 pb-3">🏃 Friend Activity</h2>
-
-          {activityLoading ? (
-            // 3 skeleton rows matching existing skeleton style
-            <div className="space-y-3">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="flex items-center gap-3 animate-pulse">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full w-3/4" />
-                    <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full w-1/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : activityFeed.length === 0 ? (
-            <div className="text-center py-6">
-              <div className="text-4xl mb-3">👀</div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet — your friends haven't completed any habits today</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {(showAllActivity ? activityFeed : activityFeed.slice(0, 10)).map((item, i) => (
-                <React.Fragment key={`${item.friendName}-${item.completedAt}-${i}`}>
-                  <div className="flex items-center gap-3 py-2.5">
-                    {/* Friend avatar */}
-                    <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                      {item.friendAvatar ? (
-                        <img src={item.friendAvatar} alt={item.friendName} className="w-10 h-10 rounded-full object-cover" />
-                      ) : (
-                        item.friendName?.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                        <span className="font-semibold">{item.friendName}</span>{' '}completed{' '}
-                        <span className="text-base">{item.habitIcon}</span>{' '}
-                        <span className="font-medium">{item.habitName}</span>
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{getRelativeTime(item.completedAt)}</p>
-                    </div>
-                  </div>
-                  {/* Separator — not after last item */}
-                  {i < (showAllActivity ? activityFeed : activityFeed.slice(0, 10)).length - 1 && (
-                    <div className="h-px bg-gray-100 dark:bg-gray-700/60" />
-                  )}
-                </React.Fragment>
-              ))}
-
-              {/* See more / less toggle */}
-              {activityFeed.length > 10 && (
-                <button
-                  onClick={() => setShowAllActivity(v => !v)}
-                  className="w-full mt-3 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 py-2 transition-colors"
-                >
-                  {showAllActivity ? 'Show less ↑' : `See all ${activityFeed.length} activities ↓`}
-                </button>
-              )}
-            </div>
-          )}
-        </section>
 
         {/* ── Section 1: Share Link ── */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">

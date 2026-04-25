@@ -289,34 +289,3 @@ export const getLeaderboard = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
-// ── GET /api/social/friends/activity ────────────────────────
-export const getFriendActivity = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).populate('friends', 'name avatar recentActivity');
-
-    const feed = [];
-    for (const friend of user.friends) {
-      for (const activity of friend.recentActivity) {
-        if (activity.isPublic) {
-          feed.push({
-            friendName: friend.name,
-            friendAvatar: friend.avatar,
-            habitName: activity.habitName,
-            habitIcon: activity.habitIcon,
-            completedAt: activity.completedAt,
-          });
-        }
-      }
-    }
-
-    // Sort by most recent first
-    feed.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
-
-    // Return only last 50 entries
-    res.json(feed.slice(0, 50));
-  } catch (err) {
-    console.error('[getFriendActivity]', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
