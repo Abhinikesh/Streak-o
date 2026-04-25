@@ -2,24 +2,27 @@
 
 // ── Push event: show the notification ────────────────────────────────────────
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? {};
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch (e) {
+    data = { title: 'StreakBoard', body: event.data?.text() || '' };
+  }
+
+  const options = {
+    body:               data.body    || '',
+    icon:               data.icon   || '/icon-192.png',
+    badge:              data.badge  || '/icon-192.png',
+    tag:                data.tag    || 'default',
+    vibrate:            [100, 50, 100],
+    data:               data.data   || { url: '/dashboard' },
+    // Forward action buttons from the push payload so they render in the tray
+    actions:            data.actions || [],
+    requireInteraction: false,
+  };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'StreakBoard', {
-      body:    data.body    || 'Time to log your habits!',
-      icon:    data.icon   || '/icon-192.png',
-      badge:   data.badge  || '/icon-192.png',
-      tag:     data.tag    || 'streakboard',
-      vibrate: [100, 50, 100],
-      // Forward actions from the push payload so notification buttons render
-      actions: data.actions || [
-        { action: 'open', title: '✅ Log Now' },
-        { action: 'dismiss', title: 'Dismiss' },
-      ],
-      data: {
-        url: data.data?.url || data.url || '/dashboard',
-      },
-    })
+    self.registration.showNotification(data.title || 'StreakBoard', options)
   );
 });
 
@@ -29,50 +32,46 @@ self.addEventListener('push', (event) => {
 // boundary). The JWT token lives in localStorage keyed 'token'. The solution:
 // postMessage the 'mark-all-done' intent to the active app window, which can
 // read the token and make the authenticated fetch itself. If no window is open
-// we fall back to opening /dashboard (user marks habits manually).
+// we fall back to opening /dashboard?action=mark-all-done so the page picks it
+// up from the URL param on load.
 //
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  // ── Dismiss button: do nothing ──────────────────────────────────────────
-  if (event.action === 'dismiss') return;
+  const action = event.action;
+  const data   = event.notification.data || {};
+  const url    = data.url || '/dashboard';
 
-  // ── Mark All Done button ────────────────────────────────────────────────
-  if (event.action === 'mark-all-done') {
+  if (action === 'mark-all-done') {
     event.waitUntil(
       clients
         .matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          if (clientList.length > 0) {
-            // App is already open — postMessage so the page makes the API call
+        .then((windowClients) => {
+          if (windowClients.length > 0) {
+            // App is already open — send postMessage so the page calls the API
             // with its own stored token, then focus that tab.
-            const target = clientList[0];
-            target.postMessage({ type: 'MARK_ALL_DONE' });
-            return target.focus();
+            windowClients[0].postMessage({ type: 'MARK_ALL_DONE' });
+            return windowClients[0].focus();
           }
-
-          // No open window — open the app; it will act on the message on load.
-          // Store the intent in a SW-accessible way via the notification data URL.
+          // No open window — open app; SwActionHandler picks up the URL param.
           return clients.openWindow('/dashboard?action=mark-all-done');
         })
     );
-    return;
-  }
-
-  // ── Open App button or notification body click (default) ────────────────
-  const url = event.notification.data?.url || '/dashboard';
-  event.waitUntil(
-    clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // Focus an existing tab showing the target URL
-        for (const client of clientList) {
-          if (client.url.includes(url) && 'focus' in client) {
-            return client.focus();
+  } else {
+    // Default: notification body tap or 'open-app' button — just open the app.
+    event.waitUntil(
+      clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((windowClients) => {
+          // Focus any existing app window (match on origin, not path)
+          for (const client of windowClients) {
+            if (client.url.includes(self.location.origin) && 'focus' in client) {
+              return client.focus();
+            }
           }
-        }
-        // No matching tab — open a new one
-        if (clients.openWindow) return clients.openWindow(url);
-      })
-  );
+          // No open window — open the target URL
+          return clients.openWindow(url);
+        })
+    );
+  }
 });
