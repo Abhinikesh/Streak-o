@@ -55,7 +55,7 @@ const FEATURES = [
 ];
 
 const MARQUEE_TEXT =
-  '🚀 Coming Soon: 💬 Personal Chat  •  🎉 NEW: 🏆 100-Day Streak Rewards  •  📱 Mobile App  •  🔔 Tap-to-Mark Notifications  •  🌐 Browser Extension  •  👥 Friend Activity Alerts  •  ';
+  'NEW: 🔔 Smart Notifications  •  NEW: 🏆 100-Day Streak Rewards  •  Coming Soon: 💬 Personal Chat  •  Coming Soon: 📱 Mobile App  •  Coming Soon: 🌐 Browser Extension  •  🎯 Daily Habit Streaks  •  📊 Stats & Insights  •  🏅 Leaderboard  •  ';
 
 // ─── CSS injected once ───────────────────────────────────────────────────────
 const CSS = `
