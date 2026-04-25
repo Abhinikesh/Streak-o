@@ -9,6 +9,7 @@ import {
   getFriends,
   removeFriend,
   getLeaderboard,
+  getFriendActivity,
 } from '../controllers/socialController.js';
 
 const router = express.Router();
@@ -23,6 +24,7 @@ router.get('/my-share', authMiddleware, getMyShareInfo);
 router.post('/friends/add', authMiddleware, addFriend);
 router.get('/friends', authMiddleware, getFriends);
 router.delete('/friends/:shareCode', authMiddleware, removeFriend);
+router.get('/friends/activity', authMiddleware, getFriendActivity);
 router.get('/leaderboard', authMiddleware, getLeaderboard);
 
 export default router;

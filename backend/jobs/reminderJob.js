@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import webpush from 'web-push';
 import User from '../models/User.js';
 import PushSubscription from '../models/PushSubscription.js';
+import { sendFriendDigest } from '../controllers/notificationController.js';
 
 // reminderTime is stored in UTC. On the frontend, the user sees their local
 // time converted to UTC before saving. See useNotifications hook for conversion.
@@ -34,34 +35,39 @@ export function startReminderJob() {
         reminderTime: currentTime,
       });
 
-      if (users.length === 0) return;
+      if (users.length > 0) {
+        const payload = JSON.stringify({
+          title: 'StreakBoard Reminder 🔥',
+          body:  'Time to log your habits and protect your streak!',
+          icon:  '/icon-192.png',
+          badge: '/icon-192.png',
+          url:   '/dashboard',
+        });
 
-      const payload = JSON.stringify({
-        title: 'StreakBoard Reminder 🔥',
-        body:  'Time to log your habits and protect your streak!',
-        icon:  '/icon-192.png',
-        badge: '/icon-192.png',
-        url:   '/dashboard',
-      });
+        for (const user of users) {
+          const subscriptions = await PushSubscription.find({ userId: user._id });
 
-      for (const user of users) {
-        const subscriptions = await PushSubscription.find({ userId: user._id });
-
-        for (const sub of subscriptions) {
-          try {
-            await webpush.sendNotification(
-              { endpoint: sub.endpoint, keys: sub.keys },
-              payload
-            );
-          } catch (pushErr) {
-            // 404 / 410 = subscription no longer valid — clean it up silently
-            if (pushErr.statusCode === 404 || pushErr.statusCode === 410) {
-              await PushSubscription.deleteOne({ _id: sub._id });
-            } else {
-              console.error('[ReminderJob] Push send error:', pushErr.message);
+          for (const sub of subscriptions) {
+            try {
+              await webpush.sendNotification(
+                { endpoint: sub.endpoint, keys: sub.keys },
+                payload
+              );
+            } catch (pushErr) {
+              // 404 / 410 = subscription no longer valid — clean it up silently
+              if (pushErr.statusCode === 404 || pushErr.statusCode === 410) {
+                await PushSubscription.deleteOne({ _id: sub._id });
+              } else {
+                console.error('[ReminderJob] Push send error:', pushErr.message);
+              }
             }
           }
         }
+      }
+
+      // ── Daily friend digest at 20:00 UTC ────────────────────────
+      if (currentTime === '20:00') {
+        await sendFriendDigest();
       }
     } catch (err) {
       // Never let a single failure crash the scheduler

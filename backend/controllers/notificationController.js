@@ -1,6 +1,8 @@
 import webpush from 'web-push';
 import User from '../models/User.js';
 import PushSubscription from '../models/PushSubscription.js';
+import Habit from '../models/Habit.js';
+import HabitLog from '../models/HabitLog.js';
 
 // ── Initialize VAPID ──────────────────────────────────────────────────────────
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -94,5 +96,76 @@ export const updateReminderSettings = async (req, res) => {
   } catch (err) {
     console.error('updateReminderSettings error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── Daily friend digest (called by cron at 20:00 UTC) ──────────────
+export const sendFriendDigest = async () => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Only process users who have at least one friend
+    const usersWithFriends = await User.find({ 'friends.0': { $exists: true } })
+      .select('_id friends');
+
+    for (const user of usersWithFriends) {
+      // Count user's active habits
+      const habitCount = await Habit.countDocuments({ userId: user._id, isActive: true });
+      if (habitCount === 0) continue;
+
+      // Count how many the user completed today
+      const userDoneToday = await HabitLog.countDocuments({
+        userId: user._id,
+        date: today,
+        status: 'done',
+      });
+
+      // Skip if user already completed all habits
+      if (userDoneToday >= habitCount) continue;
+
+      // Count how many friends completed at least one habit today
+      const friendsDoneToday = await HabitLog.countDocuments({
+        userId: { $in: user.friends },
+        date: today,
+        status: 'done',
+      });
+
+      // Only notify if at least one friend completed something
+      if (friendsDoneToday === 0) continue;
+
+      // How many distinct friends completed a habit today
+      const activeFriends = await HabitLog.distinct('userId', {
+        userId: { $in: user.friends },
+        date: today,
+        status: 'done',
+      });
+      const activeFriendCount = activeFriends.length;
+
+      const payload = JSON.stringify({
+        title: 'Your friends are crushing it! 💪',
+        body: `${activeFriendCount} of your friend${activeFriendCount > 1 ? 's' : ''} completed habits today — don’t break your streak!`,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        url: '/friends',
+      });
+
+      const subscriptions = await PushSubscription.find({ userId: user._id });
+      for (const sub of subscriptions) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: sub.keys },
+            payload
+          );
+        } catch (pushErr) {
+          if (pushErr.statusCode === 404 || pushErr.statusCode === 410) {
+            await PushSubscription.deleteOne({ _id: sub._id });
+          } else {
+            console.error('[sendFriendDigest] Push send error:', pushErr.message);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[sendFriendDigest] Error:', err);
   }
 };

@@ -32,6 +32,7 @@ const habitSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isPublic: { type: Boolean, default: true },
     badges: [
       {
         type:      { type: String, default: '100_day_streak' },

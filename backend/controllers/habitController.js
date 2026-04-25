@@ -1,4 +1,5 @@
 import Habit from "../models/Habit.js";
+import User from "../models/User.js";
 
 // ── POST /api/habits ───────────────────────────────────────────
 /**
@@ -127,5 +128,23 @@ export const deleteHabit = async (req, res) => {
   } catch (err) {
     console.error("[deleteHabit]", err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ── PATCH /api/habits/:id/privacy ─────────────────────────────
+/**
+ * Toggle isPublic on a habit.
+ * Only if the habit belongs to req.user.id.
+ */
+export const toggleHabitPrivacy = async (req, res) => {
+  try {
+    const habit = await Habit.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!habit) return res.status(404).json({ message: 'Habit not found' });
+    habit.isPublic = !habit.isPublic;
+    await habit.save();
+    res.json({ isPublic: habit.isPublic });
+  } catch (err) {
+    console.error('[toggleHabitPrivacy]', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };

@@ -37,6 +37,14 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    recentActivity: [
+      {
+        habitName: String,
+        habitIcon: String,
+        completedAt: { type: Date, default: Date.now },
+        isPublic: { type: Boolean, default: true },
+      }
+    ],
     reminderEnabled: {
       type: Boolean,
       default: false,
