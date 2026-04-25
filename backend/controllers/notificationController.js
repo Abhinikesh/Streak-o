@@ -99,7 +99,7 @@ export const updateReminderSettings = async (req, res) => {
   }
 };
 
-// ── Daily friend digest (called by cron at 20:00 UTC) ──────────────
+// ── Daily friend digest (called by cron at 20:00 UTC) ────────────────────────
 export const sendFriendDigest = async () => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -170,70 +170,104 @@ export const sendFriendDigest = async () => {
   }
 };
 
-// ── Global daily reminders (morning / afternoon / night) ────────────
-// Sends to ALL users who have a push subscription BUT do NOT have a
-// personal reminder enabled — preventing double notifications.
-// Push subscriptions live in the PushSubscription collection (not on User).
+// ── Global daily reminders (morning / afternoon / night) ─────────────────────
+// Smart: skips users who have already completed all habits today.
+// Also skips users with a personal reminder enabled — prevents doubles.
+// Subscriptions live in the PushSubscription collection, not on User.
 export const sendGlobalReminders = async (type) => {
   try {
     const messages = {
       morning: {
         title: '🌅 Good Morning, Streak Builder!',
-        body: "Start your day strong — mark your habits done! 💪",
+        body:  'Start your day strong — mark your habits done! 💪',
       },
       afternoon: {
         title: '☀️ Afternoon Check-in!',
-        body: "How are your habits going? Don't let the day slip by! 🔥",
+        body:  "How are your habits going? Don't let the day slip by! 🔥",
       },
       night: {
         title: '🌙 Last Chance Today!',
-        body: "Don't break your streak! Mark your habits before midnight 🏃",
+        body:  "Don't break your streak! Mark your habits before midnight 🏃",
       },
     };
 
     const notification = messages[type];
     if (!notification) return;
 
-    // Users who have personal reminders turned OFF (or no reminderEnabled set)
-    // — these are the only ones who receive global reminders.
+    // Today as "YYYY-MM-DD" — same format HabitLog.date uses
+    const today = new Date().toISOString().split('T')[0];
+
+    // Users with personal reminders ON get their own timed notification — exclude them
     const excludedUsers = await User.find({ reminderEnabled: true }).select('_id').lean();
-    const excludedIds = excludedUsers.map((u) => u._id);
+    const excludedIds   = excludedUsers.map((u) => u._id);
 
-    // All subscriptions whose owner is NOT in the excluded list
-    const subscriptions = await PushSubscription.find({
-      userId: { $nin: excludedIds },
-    });
+    // All push subscriptions for non-excluded users
+    const allSubs = await PushSubscription.find({ userId: { $nin: excludedIds } }).lean();
+    if (allSubs.length === 0) return;
 
-    console.log(`📢 [GlobalReminder] Sending ${type} to ${subscriptions.length} subscriptions`);
+    // Group by userId — one DB completion check per user, not per device
+    const subsByUser = new Map();
+    for (const sub of allSubs) {
+      const uid = sub.userId.toString();
+      if (!subsByUser.has(uid)) subsByUser.set(uid, []);
+      subsByUser.get(uid).push(sub);
+    }
 
-    const payload = JSON.stringify({
-      title: notification.title,
-      body:  notification.body,
-      icon:  '/icon-192.png',
-      badge: '/icon-192.png',
-      tag:   `global-${type}`,
-      data:  { url: '/dashboard' },
-    });
+    console.log(`📢 [GlobalReminder] ${type} — checking ${subsByUser.size} users`);
 
-    for (const sub of subscriptions) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: sub.keys },
-          payload
-        );
-      } catch (err) {
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          await PushSubscription.deleteOne({ _id: sub._id });
-          console.log(`🗑  [GlobalReminder] Removed expired subscription ${sub._id}`);
-        } else {
-          console.error('[GlobalReminder] Push send error:', err.message);
+    let sent    = 0;
+    let skipped = 0;
+
+    for (const [uid, subs] of subsByUser) {
+      // Count active habits — skip users with none
+      const habitCount = await Habit.countDocuments({ userId: uid, isActive: true });
+      if (habitCount === 0) { skipped++; continue; }
+
+      // Count habits already marked done today (string date, status field)
+      const doneCount = await HabitLog.countDocuments({
+        userId: uid,
+        date:   today,
+        status: 'done',
+      });
+
+      // All habits done — no point reminding
+      if (doneCount >= habitCount) {
+        console.log(`⏭  [GlobalReminder] Skipping ${uid} — all ${habitCount} habits done`);
+        skipped++;
+        continue;
+      }
+
+      const pendingCount = habitCount - doneCount;
+      const payload = JSON.stringify({
+        title: notification.title,
+        body:  `${notification.body} (${pendingCount} habit${pendingCount > 1 ? 's' : ''} remaining)`,
+        icon:  '/icon-192.png',
+        badge: '/icon-192.png',
+        tag:   `global-${type}`,
+        data:  { url: '/dashboard' },
+      });
+
+      // Send to every registered device for this user
+      for (const sub of subs) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: sub.keys },
+            payload
+          );
+          sent++;
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await PushSubscription.deleteOne({ _id: sub._id });
+            console.log(`🗑  [GlobalReminder] Removed expired subscription ${sub._id}`);
+          } else {
+            console.error('[GlobalReminder] Push send error:', err.message);
+          }
         }
       }
     }
 
-    console.log(`✅ [GlobalReminder] ${type} done`);
+    console.log(`✅ [GlobalReminder] ${type} done — sent: ${sent}, skipped (all done/no habits): ${skipped}`);
   } catch (err) {
     console.error(`❌ [GlobalReminder] Error:`, err);
   }
 };
-
