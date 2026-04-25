@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 import LoginPage from './pages/LoginPage';
@@ -20,9 +21,41 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import NotFoundPage from './pages/NotFoundPage';
 import FeedbackWidget from './components/FeedbackWidget';
 import ComingSoonAnnouncement from './components/ComingSoonAnnouncement';
+import NotificationPrompt from './components/notifications/NotificationPrompt';
 
 const queryClient = new QueryClient();
 
+// ── Inner component — must live inside AuthProvider to use useAuth ────────────
+function NotificationPromptManager() {
+  const { user } = useAuth();
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Don't show if browser already has a decision (granted or denied)
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'default') return;
+
+    // Don't show if user already accepted
+    if (localStorage.getItem('notificationPromptSeen')) return;
+
+    // Don't show if currently snoozed
+    const snoozed = localStorage.getItem('notificationPromptSnoozed');
+    if (snoozed && Date.now() < parseInt(snoozed, 10)) return;
+
+    // Delay 3 s so the page finishes loading before the prompt appears
+    const timer = setTimeout(() => setShowPrompt(true), 3000);
+    return () => clearTimeout(timer);
+  }, [user]);
+
+  if (!showPrompt) return null;
+
+  return (
+    <NotificationPrompt onDismiss={() => setShowPrompt(false)} />
+  );
+}
+
+// ── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <ThemeProvider>
@@ -31,6 +64,7 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <FeedbackWidget />
+            <NotificationPromptManager />
             <Toaster 
               position="top-right" 
               toastOptions={{
@@ -68,3 +102,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
