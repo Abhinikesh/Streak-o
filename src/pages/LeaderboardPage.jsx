@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Navbar from '../components/layout/Navbar';
 import { useTheme } from '../context/ThemeContext';
+import StreakRulePopup from '../components/StreakRulePopup';
 
 // ─── Sort options ─────────────────────────────────────────────────────────────
 const SORT_OPTIONS = [
@@ -326,6 +327,7 @@ export default function LeaderboardPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: isDark ? undefined : '#f9fafb' }}>
+      <StreakRulePopup />
       <Navbar />
 
       {/* Inject keyframe for skeleton */}
