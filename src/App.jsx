@@ -9,6 +9,7 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
@@ -133,11 +134,13 @@ export default function App() {
               }}
             />
             <Routes>
+              {/* Public routes — no auth required */}
+              <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/auth/callback" element={<AuthCallbackPage />} />
-              {/* Public — no auth required */}
               <Route path="/u/:shareCode" element={<PublicProfilePage />} />
-              
+
+              {/* Protected routes — ProtectedRoute checks auth */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
@@ -146,7 +149,6 @@ export default function App() {
                 <Route path="/journal" element={<JournalPage />} />
                 <Route path="/friends" element={<FriendsPage />} />
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>
 
               <Route path="*" element={<NotFoundPage />} />

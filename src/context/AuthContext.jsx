@@ -46,13 +46,13 @@ export function AuthProvider({ children }) {
   }, [fetchMe]);
 
   /**
-   * logout() — clear everything and redirect to /login.
+   * logout() — clear everything and redirect to / (landing page).
    */
   const logout = useCallback(() => {
     localStorage.clear();
     setToken(null);
     setUser(null);
-    navigate('/login');
+    navigate('/');
   }, [navigate]);
 
   /**
