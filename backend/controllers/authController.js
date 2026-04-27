@@ -116,12 +116,15 @@ export const verifyOTPLogin = async (req, res) => {
 export const googleCallback = async (req, res) => {
   try {
     // req.user is attached by the Passport GoogleStrategy verify callback
-    const { _id, email, name, avatar } = req.user;
+    const { _id, email } = req.user;
 
     const token = generateToken({ id: _id, email });
 
-    const clientUrl = process.env.CLIENT_URL || "https://streak-o.vercel.app";
-    return res.redirect(`${clientUrl}/auth/callback?token=${token}`);
+    // If the caller supplied a redirectUrl (e.g. from the mobile app deep link),
+    // redirect there instead of the web frontend so the token is delivered correctly.
+    const fallbackUrl = process.env.CLIENT_URL || "https://streak-o.vercel.app";
+    const redirectUrl = req.query.redirectUrl || `${fallbackUrl}/auth/callback`;
+    return res.redirect(`${redirectUrl}?token=${token}`);
   } catch (err) {
     console.error("[googleCallback]", err);
     return res.status(500).json({ message: "Server error" });
